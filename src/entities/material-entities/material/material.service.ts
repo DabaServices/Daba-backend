@@ -48,8 +48,8 @@ export class MaterialService {
         return [...materialsResults, ...standardGroupResults];
     }
 
-    async fetchTwenty(filter: string, unitId: number, tab: number) {
-        const { materials, comments, standardGroups, favoriteIds } = await this.repository.fetchBySearch(filter, unitId, tab);
+    async fetchTwenty(filter: string, unitId: number) {
+        const { materials, comments, standardGroups, favoriteIds } = await this.repository.fetchBySearch(filter, unitId);
         const reportCommentsByMaterial = new Map<string, Map<number, string>>();
 
         for (const comment of comments) {
@@ -101,11 +101,10 @@ export class MaterialService {
             .slice(0, 20);
     }
 
-    async fetchByIds(pastedMaterials: PastedMaterialsDto, screenUnitId: number, tab: number) {
+    async fetchByIds(pastedMaterials: PastedMaterialsDto, screenUnitId: number) {
         const { materials, standardGroups, favoriteIds } = await this.repository.fetchByIds(
             pastedMaterials.materialsIds,
             screenUnitId,
-            tab
         );
 
         const materialResults = materials.map(material => ({

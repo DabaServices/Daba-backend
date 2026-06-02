@@ -14,10 +14,6 @@ import { UnitFavoriteMaterial } from "../unit-favorite-material/unit-favorite-ma
 import { getActiveToolStandardGroupConstraint, getMaterialSupplyCenterTypeWhere } from "./material-query.utils";
 import { Material } from "./material.model";
 
-const getMaterialTypesForTab = (tab?: number) => Number(tab) === REPORT_TYPES.INVENTORY
-    ? [MATERIAL_TYPES.ITEM, MATERIAL_TYPES.TOOL]
-    : [MATERIAL_TYPES.ITEM];
-
 const getMaterialStandardGroupInclude = () => ({
     attributes: ["groupId", "materialId"],
     model: MaterialStandardGroup,
@@ -72,7 +68,7 @@ export class MaterialRepository {
             where: {
                 recordStatus: RECORD_STATUS.ACTIVE,
                 [Op.and]: [
-                    getMaterialSupplyCenterTypeWhere(REPORT_TYPES.INVENTORY),
+                    getMaterialSupplyCenterTypeWhere(),
                     getActiveToolStandardGroupConstraint()
                 ]
             }
@@ -126,7 +122,7 @@ export class MaterialRepository {
                 where: {
                     id: { [Op.in]: materialIds },
                     [Op.and]: [
-                        getMaterialSupplyCenterTypeWhere(REPORT_TYPES.INVENTORY),
+                        getMaterialSupplyCenterTypeWhere(),
                         getActiveToolStandardGroupConstraint()
                     ]
                 }
@@ -169,7 +165,7 @@ export class MaterialRepository {
         return [...materials, ...standardGroupMaterials];
     }
 
-    async fetchBySearch(filter: string, unitId: number, tab: number) {
+    async fetchBySearch(filter: string, unitId: number) {
         const materials = await this.materialModel.findAll({
             include: [{
                 attributes: ["materialId"],
@@ -199,7 +195,7 @@ export class MaterialRepository {
                             { description: { [Op.iLike]: `%${filter}%` } }
                         ],
                     },
-                    getMaterialSupplyCenterTypeWhere(tab),
+                    getMaterialSupplyCenterTypeWhere(),
                     getActiveToolStandardGroupConstraint()
                 ],
                 recordStatus: RECORD_STATUS.ACTIVE,
@@ -225,7 +221,7 @@ export class MaterialRepository {
                     { name: { [Op.iLike]: `%${filter}%` } }
                 ],
                 groupType: {
-                    [Op.in]: getMaterialTypesForTab(tab)
+                    [Op.in]: [MATERIAL_TYPES.ITEM, MATERIAL_TYPES.TOOL]
                 },
                 status: RECORD_STATUS.ACTIVE
             }
@@ -257,7 +253,7 @@ export class MaterialRepository {
         };
     }
 
-    async fetchByIds(materialsIds: string[], unitId: number, tab: number) {
+    async fetchByIds(materialsIds: string[], unitId: number) {
         const materials = await this.materialModel.findAll({
             include: [{
                 attributes: ["materialId"],
@@ -283,7 +279,7 @@ export class MaterialRepository {
                 id: { [Op.in]: materialsIds },
                 recordStatus: RECORD_STATUS.ACTIVE,
                 [Op.and]: [
-                    getMaterialSupplyCenterTypeWhere(tab),
+                    getMaterialSupplyCenterTypeWhere(),
                     getActiveToolStandardGroupConstraint()
                 ]
             },
@@ -304,7 +300,7 @@ export class MaterialRepository {
             where: {
                 id: { [Op.in]: materialsIds },
                 groupType: {
-                    [Op.in]: getMaterialTypesForTab(tab)
+                    [Op.in]: [MATERIAL_TYPES.ITEM, MATERIAL_TYPES.TOOL]
                 },
                 status: RECORD_STATUS.ACTIVE
             }
