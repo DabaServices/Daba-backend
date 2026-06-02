@@ -9,6 +9,7 @@ export type UnitHierarchyNode = {
   level: number;
   simul: string;
   isConnectedToRoot?: boolean;
+  isConnectedToMatkal?: boolean;
   isRootUnit?: boolean;
   isEmergencyUnit: boolean;
   parent?: UnitHierarchyParent | null;

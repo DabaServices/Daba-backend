@@ -235,6 +235,10 @@ export class UnitHierarchyService {
     }
 
     const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, directParentRelations);
+    const matkalConnectedUnitIds = new Set([
+      MATKAL_UNIT_ID,
+      ...buildConnectedUnitIds(MATKAL_UNIT_ID, directParentRelations),
+    ]);
     const connectedUnitIds = connectedRootUnitId
       ? new Set([
           connectedRootUnitId,
@@ -266,6 +270,7 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isEmergencyUnit: emergencyUnitIds.has(unitId),
+        isConnectedToMatkal: matkalConnectedUnitIds.has(unitId),
         ...(connectedUnitIds
           ? {
               isConnectedToRoot: connectedUnitIds.has(unitId),
@@ -420,6 +425,10 @@ export class UnitHierarchyService {
       screenUnitId,
       activeRelations,
     );
+    const matkalConnectedUnitIds = new Set([
+      MATKAL_UNIT_ID,
+      ...buildConnectedUnitIds(MATKAL_UNIT_ID, activeRelations),
+    ]);
     const parentByChild = new Map<number, number>();
     for (const relation of activeRelations) {
       if (!parentByChild.has(relation.relatedUnitId)) {
@@ -508,6 +517,7 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isConnectedToRoot: connectedUnitIds.has(unitId),
+        isConnectedToMatkal: matkalConnectedUnitIds.has(unitId),
         isEmergencyUnit: emergencyUnitIds.has(unitId),
         status,
         parent,

@@ -75,6 +75,7 @@ describe('UnitHierarchyService', () => {
           level: 0,
           simul: '1',
           isConnectedToRoot: true,
+          isConnectedToMatkal: false,
           isRootUnit: true,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
@@ -86,6 +87,7 @@ describe('UnitHierarchyService', () => {
           level: 1,
           simul: '2',
           isConnectedToRoot: true,
+          isConnectedToMatkal: false,
           isRootUnit: false,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
@@ -103,6 +105,7 @@ describe('UnitHierarchyService', () => {
           level: 2,
           simul: '10',
           isConnectedToRoot: false,
+          isConnectedToMatkal: false,
           isRootUnit: false,
           isEmergencyUnit: true,
           status: { id: 0, description: 'בדיווח' },
@@ -114,6 +117,7 @@ describe('UnitHierarchyService', () => {
           level: 4,
           simul: '11',
           isConnectedToRoot: false,
+          isConnectedToMatkal: false,
           isRootUnit: false,
           isEmergencyUnit: true,
           status: { id: 0, description: 'בדיווח' },
@@ -133,6 +137,7 @@ describe('UnitHierarchyService', () => {
     it('returns lower-level units with recursive connection to the screen unit', async () => {
       const { service } = buildService({
         unitDetails: [
+          buildUnitDetail(6133, 'Matkal', 0),
           buildUnitDetail(1, 'Root', 0),
           buildUnitDetail(2, 'Screen', 1),
           buildUnitDetail(3, 'Direct child', 2),
@@ -141,6 +146,7 @@ describe('UnitHierarchyService', () => {
           buildUnitDetail(6, 'Another parent', 1),
         ],
         relations: [
+          buildRelation(6133, 2),
           buildRelation(1, 2),
           buildRelation(2, 3),
           buildRelation(3, 4),
@@ -157,6 +163,7 @@ describe('UnitHierarchyService', () => {
           level: 2,
           simul: '3',
           isConnectedToRoot: true,
+          isConnectedToMatkal: true,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
           parent: {
@@ -173,6 +180,7 @@ describe('UnitHierarchyService', () => {
           level: 2,
           simul: '5',
           isConnectedToRoot: false,
+          isConnectedToMatkal: false,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
           parent: {
@@ -189,6 +197,7 @@ describe('UnitHierarchyService', () => {
           level: 3,
           simul: '4',
           isConnectedToRoot: true,
+          isConnectedToMatkal: true,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
           parent: {
