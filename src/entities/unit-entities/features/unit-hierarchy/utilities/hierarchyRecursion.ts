@@ -78,6 +78,7 @@ export const getRootUnit = (
     level: unit?.unitLevelId ?? 0,
     simul: unit?.tsavIrgunCodeId ?? '',
     isEmergencyUnit: emergencyUnitIds.has(unitId),
+    isConnectedToRoot: true,
     status: getStatusFromUnit(relation?.unit),
     parent: null,
   };
@@ -97,6 +98,7 @@ const getUnit = (
     level: unit?.unitLevelId ?? 0,
     simul: unit?.tsavIrgunCodeId ?? '',
     isEmergencyUnit: emergencyUnitIds.has(unitId),
+    isConnectedToRoot: true,
     status: getStatusFromUnit(relation?.relatedUnit),
     parent: {
       description: parentUnit?.description ?? '',

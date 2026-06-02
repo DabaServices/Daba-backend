@@ -10,7 +10,6 @@ import { UnitHierarchyNode } from './unit-hierarchy.types';
 import {
   getEmergencyUnitIds,
   getHierarchy,
-  getRootUnit,
   getStatusFromUnit,
 } from './utilities/hierarchyRecursion';
 import { UnitRelation } from '../../unit-relations/unit-relation.model';
@@ -18,6 +17,7 @@ import { RemoveUnitRelationDto } from './DTO/remove-unit-relation.dto';
 import { AddUnitRelationDto } from './DTO/add-unit-relation.dto';
 import { TransferUnitRelationDto } from './DTO/update-unit-relation.dto';
 import {
+  UNIT_LEVELS,
   MATKAL_UNIT_ID,
   MESSAGE_TYPES,
   UNIT_STATUSES,
@@ -47,11 +47,104 @@ const LOWER_UNIT_HAS_ANOTHER_ACTIVE_RELATION_ERROR =
 const RELATION_ALREADY_EXISTS_ERROR = 'הקשר כבר קיים';
 const ADD_PARENT_LOCKED_ERROR = 'יחידת האב נעולה, אין אפשרות ליצור את הקשר';
 const UNIT_COMBOBOX_RESULT_LIMIT = 20;
+const LOWER_LEVEL_UNITS_RESULT_LIMIT = 10;
 
 type SearchUnitsComboboxOptions = {
   filter: string;
   currentLevel: number;
   parentUnitId?: number;
+};
+
+type LowerLevelUnitsConnectionOptions = {
+  filter?: string;
+  limit?: number;
+  offset?: number;
+  isConnectedToRoot?: boolean;
+};
+
+type ActiveUnitRelationEdge = {
+  unitId: number;
+  relatedUnitId: number;
+};
+
+const buildConnectedUnitIds = (
+  rootUnitId: number,
+  relations: ActiveUnitRelationEdge[],
+): Set<number> => {
+  const childrenByParent = new Map<number, number[]>();
+
+  for (const relation of relations) {
+    const children = childrenByParent.get(relation.unitId) ?? [];
+    children.push(relation.relatedUnitId);
+    childrenByParent.set(relation.unitId, children);
+  }
+
+  const connectedUnitIds = new Set<number>();
+  const queue = [...(childrenByParent.get(rootUnitId) ?? [])];
+
+  while (queue.length > 0) {
+    const unitId = queue.shift();
+    if (unitId === undefined || connectedUnitIds.has(unitId)) continue;
+
+    connectedUnitIds.add(unitId);
+    queue.push(...(childrenByParent.get(unitId) ?? []));
+  }
+
+  return connectedUnitIds;
+};
+
+const normalizeLowerLevelLimit = (limit?: number): number => {
+  if (limit === undefined || !Number.isInteger(limit) || limit <= 0) {
+    return LOWER_LEVEL_UNITS_RESULT_LIMIT;
+  }
+
+  return Math.min(limit, LOWER_LEVEL_UNITS_RESULT_LIMIT);
+};
+
+const normalizeLowerLevelOffset = (offset?: number): number => {
+  if (offset === undefined || !Number.isInteger(offset) || offset < 0) {
+    return 0;
+  }
+
+  return offset;
+};
+
+const buildEmergencyUnitIds = (
+  detailByUnit: Map<number, Unit>,
+  relations: ActiveUnitRelationEdge[],
+): Set<number> => {
+  const emergencyUnitIds = new Set<number>();
+  const parentIdsByChild = new Map<number, number[]>();
+  const gdudUnitIds: number[] = [];
+
+  for (const [unitId, detail] of detailByUnit) {
+    if ((detail.unitLevelId ?? 0) === UNIT_LEVELS.GDUD) {
+      emergencyUnitIds.add(unitId);
+      gdudUnitIds.push(unitId);
+    }
+  }
+
+  for (const relation of relations) {
+    const parentIds = parentIdsByChild.get(relation.relatedUnitId) ?? [];
+    parentIds.push(relation.unitId);
+    parentIdsByChild.set(relation.relatedUnitId, parentIds);
+  }
+
+  const queue = [...gdudUnitIds];
+  while (queue.length > 0) {
+    const childId = queue.shift();
+    if (!childId) continue;
+
+    const parentIds = parentIdsByChild.get(childId) ?? [];
+    for (const parentId of parentIds) {
+      if (emergencyUnitIds.has(parentId)) continue;
+
+      emergencyUnitIds.add(parentId);
+      queue.push(parentId);
+    }
+  }
+
+  return emergencyUnitIds;
 };
 
 @Injectable()
@@ -81,58 +174,24 @@ export class UnitHierarchyService {
         });
       }
 
-      const unitsRelations = (await this.repository.fetchActive(
-        date,
-      )) as UnitRelation[];
-      const emergencyUnitIds = getEmergencyUnitIds(unitsRelations);
+      const units = await this.getAllUnitsWithParents(date, rootUnit);
+      const rootNode = units.find((unit) => unit.id === rootUnit);
 
-      const rootChildren = unitsRelations.filter(
-        (relation) => relation?.dataValues?.unitId === rootUnit,
-      );
-
-      const hierarchy = getHierarchy(
-        unitsRelations,
-        rootChildren,
-        emergencyUnitIds,
-      );
-
-      const rootNode = getRootUnit(unitsRelations, rootUnit, emergencyUnitIds);
-
-      if (isEmptyish(rootNode?.description)) {
+      if (!rootNode || isEmptyish(rootNode.description)) {
         throw new BadGatewayException({
           message: 'היחידה שאליה אתה מקושר לא קיימת, יש ליצור קשר עם התמיכה',
           type: 'Fatal',
         });
       }
 
-      if (isEmptyish(hierarchy)) {
+      if (!units.some((unit) => unit.parent?.id === rootUnit)) {
         throw new BadGatewayException({
           message: 'אין היררכיה ליחידה הנתונה',
           type: 'Fatal',
         });
       }
 
-      const normalized = hierarchy.map((node) => ({
-        ...node,
-        status: node.status ?? DEFAULT_STATUS,
-        parent: node.parent
-          ? {
-              ...node.parent,
-              status: node.parent.status ?? DEFAULT_STATUS,
-            }
-          : null,
-      }));
-
-      if (!rootNode) return normalized;
-
-      return [
-        {
-          ...rootNode,
-          status: rootNode.status ?? DEFAULT_STATUS,
-          parent: null,
-        },
-        ...normalized,
-      ].sort((a, b) => a.level - b.level);
+      return units;
     } catch (error) {
       this.logger.error(
         'Failed to fetch hierarchy for user',
@@ -142,7 +201,7 @@ export class UnitHierarchyService {
     }
   }
 
-  async getAllUnitsWithParents(date: string) {
+  async getAllUnitsWithParents(date: string, connectedRootUnitId?: number) {
     const unitDetails = await this.repository.fetchAllActiveUnitDetails(date);
     if (unitDetails.length === 0) return [];
 
@@ -169,39 +228,19 @@ export class UnitHierarchyService {
     }
 
     const parentByChild = new Map<number, number>();
-    const parentIdsByChild = new Map<number, number[]>();
     for (const relation of directParentRelations) {
       if (!parentByChild.has(relation.relatedUnitId)) {
         parentByChild.set(relation.relatedUnitId, relation.unitId);
       }
-
-      const parentIds = parentIdsByChild.get(relation.relatedUnitId) ?? [];
-      parentIds.push(relation.unitId);
-      parentIdsByChild.set(relation.relatedUnitId, parentIds);
     }
 
-    const emergencyUnitIds = new Set<number>();
-    const gdudUnitIds: number[] = [];
-    for (const unitId of uniqueUnitIds) {
-      const level = detailByUnit.get(unitId)?.unitLevelId ?? 0;
-      if (level === 4) {
-        emergencyUnitIds.add(unitId);
-        gdudUnitIds.push(unitId);
-      }
-    }
-
-    const queue = [...gdudUnitIds];
-    while (queue.length > 0) {
-      const childId = queue.shift();
-      if (!childId) continue;
-
-      const parentIds = parentIdsByChild.get(childId) ?? [];
-      for (const parentId of parentIds) {
-        if (emergencyUnitIds.has(parentId)) continue;
-        emergencyUnitIds.add(parentId);
-        queue.push(parentId);
-      }
-    }
+    const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, directParentRelations);
+    const connectedUnitIds = connectedRootUnitId
+      ? new Set([
+          connectedRootUnitId,
+          ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
+        ])
+      : null;
 
     const units = uniqueUnitIds.map((unitId): UnitHierarchyNode => {
       const detail = detailByUnit.get(unitId);
@@ -227,6 +266,12 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isEmergencyUnit: emergencyUnitIds.has(unitId),
+        ...(connectedUnitIds
+          ? {
+              isConnectedToRoot: connectedUnitIds.has(unitId),
+              isRootUnit: unitId === connectedRootUnitId,
+            }
+          : {}),
         status,
         parent,
       };
@@ -330,6 +375,144 @@ export class UnitHierarchyService {
         if (left.level !== right.level) return left.level - right.level;
         return left.id - right.id;
       });
+  }
+
+  async getLowerLevelUnitsConnection(
+    date: string,
+    screenUnitId: number,
+    {
+      filter = "",
+      limit,
+      offset,
+      isConnectedToRoot,
+    }: LowerLevelUnitsConnectionOptions = {},
+  ): Promise<UnitHierarchyNode[]> {
+    if (!Number.isInteger(screenUnitId) || screenUnitId <= 0) {
+      throw new BadRequestException({
+        message: 'Missing screen unit',
+        type: MESSAGE_TYPES.FAILURE,
+      });
+    }
+
+    const unitDetails = await this.repository.fetchAllActiveUnitDetails(date);
+    if (unitDetails.length === 0) return [];
+
+    const detailByUnit = new Map<number, Unit>();
+    for (const detail of unitDetails) {
+      if (!detailByUnit.has(detail.unitId)) {
+        detailByUnit.set(detail.unitId, detail);
+      }
+    }
+
+    const screenUnit = detailByUnit.get(screenUnitId);
+    if (!screenUnit) {
+      throw new BadRequestException({
+        message: 'Screen unit does not exist for the selected date',
+        type: MESSAGE_TYPES.FAILURE,
+      });
+    }
+
+    const activeRelations = await this.repository.fetchDirectParentRelations(
+      date,
+      Array.from(detailByUnit.keys()),
+    );
+    const connectedUnitIds = buildConnectedUnitIds(
+      screenUnitId,
+      activeRelations,
+    );
+    const parentByChild = new Map<number, number>();
+    for (const relation of activeRelations) {
+      if (!parentByChild.has(relation.relatedUnitId)) {
+        parentByChild.set(relation.relatedUnitId, relation.unitId);
+      }
+    }
+
+    const screenUnitLevel = screenUnit.unitLevelId ?? 0;
+    const normalizedFilter = filter.trim().toLowerCase();
+    const lowerUnitIds = Array.from(detailByUnit.keys())
+      .filter((unitId) => {
+        const detail = detailByUnit.get(unitId);
+        const unitLevel = detail?.unitLevelId ?? 0;
+        if (unitLevel <= screenUnitLevel) return false;
+
+        const isConnected = connectedUnitIds.has(unitId);
+        if (
+          isConnectedToRoot !== undefined &&
+          isConnected !== isConnectedToRoot
+        ) {
+          return false;
+        }
+
+        if (!normalizedFilter) return true;
+
+        return [
+          detail?.description ?? '',
+          detail?.tsavIrgunCodeId ?? '',
+          String(unitId),
+        ].some((value) => value.toLowerCase().includes(normalizedFilter));
+      })
+      .sort((left, right) => {
+        const leftLevel = detailByUnit.get(left)?.unitLevelId ?? 0;
+        const rightLevel = detailByUnit.get(right)?.unitLevelId ?? 0;
+
+        if (leftLevel !== rightLevel) return leftLevel - rightLevel;
+        return left - right;
+      });
+
+    if (lowerUnitIds.length === 0) return [];
+
+    const normalizedOffset = normalizeLowerLevelOffset(offset);
+    const pagedUnitIds = lowerUnitIds.slice(
+      normalizedOffset,
+      normalizedOffset + normalizeLowerLevelLimit(limit),
+    );
+
+    if (pagedUnitIds.length === 0) return [];
+
+    const parentUnitIds = pagedUnitIds
+      .map((unitId) => parentByChild.get(unitId))
+      .filter((unitId): unitId is number => unitId !== undefined);
+    const unitStatuses = await this.repository.fetchUnitStatusesForDate(
+      date,
+      Array.from(new Set([...pagedUnitIds, ...parentUnitIds])),
+    );
+    const statusByUnit = new Map<number, UnitStatus>();
+    for (const status of unitStatuses) {
+      if (!statusByUnit.has(status.unitId)) {
+        statusByUnit.set(status.unitId, status);
+      }
+    }
+
+    const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, activeRelations);
+
+    return pagedUnitIds.map((unitId): UnitHierarchyNode => {
+      const detail = detailByUnit.get(unitId);
+      const status =
+        statusByUnit.get(unitId)?.unitStatus?.dataValues ?? DEFAULT_STATUS;
+      const parentId = parentByChild.get(unitId);
+      const parent = parentId
+        ? {
+            id: parentId,
+            description: detailByUnit.get(parentId)?.description ?? '',
+            level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
+            simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
+            status:
+              statusByUnit.get(parentId)?.unitStatus?.dataValues ??
+              DEFAULT_STATUS,
+          }
+        : null;
+
+      return {
+        id: unitId,
+        description: detail?.description ?? '',
+        level: detail?.unitLevelId ?? 0,
+        simul: detail?.tsavIrgunCodeId ?? '',
+        isConnectedToRoot: connectedUnitIds.has(unitId),
+        isEmergencyUnit: emergencyUnitIds.has(unitId),
+        status,
+        parent,
+      };
+    });
   }
 
   async removeUnitRelation(

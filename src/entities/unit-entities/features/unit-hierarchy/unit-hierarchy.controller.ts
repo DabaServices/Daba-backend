@@ -36,6 +36,33 @@ export class UnitHierarchyController {
     return this.service.getHierarchyForUser(username, request?.["date"]);
   }
 
+  @Get("lower-levels")
+  async getLowerLevelUnits(
+    @Req() request: Request,
+    @Query("filter") filter = "",
+    @Query("limit") limit?: string,
+    @Query("offset") offset?: string,
+    @Query("isConnectedToRoot") isConnectedToRoot?: string,
+  ) {
+    const parsedIsConnectedToRoot =
+      isConnectedToRoot === "true"
+        ? true
+        : isConnectedToRoot === "false"
+          ? false
+          : undefined;
+
+    return this.service.getLowerLevelUnitsConnection(
+      request?.["date"],
+      Number(request.headers["unit"]),
+      {
+        filter,
+        limit: Number(limit),
+        offset: Number(offset),
+        isConnectedToRoot: parsedIsConnectedToRoot,
+      },
+    );
+  }
+
   @RequireScreenUnitRequesting()
   @Post("hierarchy")
   addUnitRelation(
