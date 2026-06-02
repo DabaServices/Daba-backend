@@ -20,14 +20,21 @@ const buildRelation = (unitId: number, relatedUnitId: number) => ({
 const buildService = ({
   unitDetails,
   relations,
+  rootUnitId = 1,
 }: {
   unitDetails: ReturnType<typeof buildUnitDetail>[];
   relations: ReturnType<typeof buildRelation>[];
+  rootUnitId?: number;
 }) => {
   const repository = {
     fetchAllActiveUnitDetails: jest.fn().mockResolvedValue(unitDetails),
     fetchDirectParentRelations: jest.fn().mockResolvedValue(relations),
     fetchUnitStatusesForDate: jest.fn().mockResolvedValue([]),
+  };
+  const unitUserRepository = {
+    fetchUnitUser: jest.fn().mockResolvedValue({
+      dataValues: { unitId: rootUnitId },
+    }),
   };
 
   return {
@@ -37,12 +44,91 @@ const buildService = ({
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
+      unitUserRepository as any,
     ),
   };
 };
 
 describe('UnitHierarchyService', () => {
+  describe('getHierarchyForUser', () => {
+    it('returns all active units and marks only the user-root branch as connected', async () => {
+      const { service } = buildService({
+        rootUnitId: 1,
+        unitDetails: [
+          buildUnitDetail(1, 'Root', 0),
+          buildUnitDetail(2, 'Connected child', 1),
+          buildUnitDetail(10, 'Unconnected parent', 2),
+          buildUnitDetail(11, 'Unconnected child', 4),
+        ],
+        relations: [
+          buildRelation(1, 2),
+          buildRelation(10, 11),
+        ],
+      });
+
+      await expect(
+        service.getHierarchyForUser('test-user', '2026-06-02'),
+      ).resolves.toEqual([
+        {
+          id: 1,
+          description: 'Root',
+          level: 0,
+          simul: '1',
+          isConnectedToRoot: true,
+          isRootUnit: true,
+          isEmergencyUnit: false,
+          status: { id: 0, description: 'בדיווח' },
+          parent: null,
+        },
+        {
+          id: 2,
+          description: 'Connected child',
+          level: 1,
+          simul: '2',
+          isConnectedToRoot: true,
+          isRootUnit: false,
+          isEmergencyUnit: false,
+          status: { id: 0, description: 'בדיווח' },
+          parent: {
+            id: 1,
+            description: 'Root',
+            level: 0,
+            simul: '1',
+            status: { id: 0, description: 'בדיווח' },
+          },
+        },
+        {
+          id: 10,
+          description: 'Unconnected parent',
+          level: 2,
+          simul: '10',
+          isConnectedToRoot: false,
+          isRootUnit: false,
+          isEmergencyUnit: true,
+          status: { id: 0, description: 'בדיווח' },
+          parent: null,
+        },
+        {
+          id: 11,
+          description: 'Unconnected child',
+          level: 4,
+          simul: '11',
+          isConnectedToRoot: false,
+          isRootUnit: false,
+          isEmergencyUnit: true,
+          status: { id: 0, description: 'בדיווח' },
+          parent: {
+            id: 10,
+            description: 'Unconnected parent',
+            level: 2,
+            simul: '10',
+            status: { id: 0, description: 'בדיווח' },
+          },
+        },
+      ]);
+    });
+  });
+
   describe('getLowerLevelUnitsConnection', () => {
     it('returns lower-level units with recursive connection to the screen unit', async () => {
       const { service } = buildService({
@@ -143,4 +229,5 @@ describe('UnitHierarchyService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
+
 });

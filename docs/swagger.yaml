@@ -406,8 +406,8 @@ paths:
   /units/hierarchy:
     get:
       tags: [UnitsHierarchy]
-      summary: Fetch hierarchy for root unit
-      description: Builds hierarchy rooted at header `unit` (defaults to 1 when missing).
+      summary: Fetch active unit hierarchy graph
+      description: Returns all active units for the screen date with parent, status, emergency, and `isConnectedToRoot` markers relative to the authenticated user's root unit.
       parameters:
         - $ref: '#/components/parameters/ScreenDateHeader'
         - $ref: '#/components/parameters/UserHeader'
@@ -743,6 +743,8 @@ components:
         isEmergencyUnit:
           type: boolean
         isConnectedToRoot:
+          type: boolean
+        isRootUnit:
           type: boolean
         status:
           $ref: '#/components/schemas/UnitStatus'

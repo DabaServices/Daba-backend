@@ -10,7 +10,6 @@ import { UnitHierarchyNode } from './unit-hierarchy.types';
 import {
   getEmergencyUnitIds,
   getHierarchy,
-  getRootUnit,
   getStatusFromUnit,
 } from './utilities/hierarchyRecursion';
 import { UnitRelation } from '../../unit-relations/unit-relation.model';
@@ -175,58 +174,24 @@ export class UnitHierarchyService {
         });
       }
 
-      const unitsRelations = (await this.repository.fetchActive(
-        date,
-      )) as UnitRelation[];
-      const emergencyUnitIds = getEmergencyUnitIds(unitsRelations);
+      const units = await this.getAllUnitsWithParents(date, rootUnit);
+      const rootNode = units.find((unit) => unit.id === rootUnit);
 
-      const rootChildren = unitsRelations.filter(
-        (relation) => relation?.dataValues?.unitId === rootUnit,
-      );
-
-      const hierarchy = getHierarchy(
-        unitsRelations,
-        rootChildren,
-        emergencyUnitIds,
-      );
-
-      const rootNode = getRootUnit(unitsRelations, rootUnit, emergencyUnitIds);
-
-      if (isEmptyish(rootNode?.description)) {
+      if (!rootNode || isEmptyish(rootNode.description)) {
         throw new BadGatewayException({
           message: 'היחידה שאליה אתה מקושר לא קיימת, יש ליצור קשר עם התמיכה',
           type: 'Fatal',
         });
       }
 
-      if (isEmptyish(hierarchy)) {
+      if (!units.some((unit) => unit.parent?.id === rootUnit)) {
         throw new BadGatewayException({
           message: 'אין היררכיה ליחידה הנתונה',
           type: 'Fatal',
         });
       }
 
-      const normalized = hierarchy.map((node) => ({
-        ...node,
-        status: node.status ?? DEFAULT_STATUS,
-        parent: node.parent
-          ? {
-              ...node.parent,
-              status: node.parent.status ?? DEFAULT_STATUS,
-            }
-          : null,
-      }));
-
-      if (!rootNode) return normalized;
-
-      return [
-        {
-          ...rootNode,
-          status: rootNode.status ?? DEFAULT_STATUS,
-          parent: null,
-        },
-        ...normalized,
-      ].sort((a, b) => a.level - b.level);
+      return units;
     } catch (error) {
       this.logger.error(
         'Failed to fetch hierarchy for user',
@@ -236,7 +201,7 @@ export class UnitHierarchyService {
     }
   }
 
-  async getAllUnitsWithParents(date: string) {
+  async getAllUnitsWithParents(date: string, connectedRootUnitId?: number) {
     const unitDetails = await this.repository.fetchAllActiveUnitDetails(date);
     if (unitDetails.length === 0) return [];
 
@@ -263,39 +228,19 @@ export class UnitHierarchyService {
     }
 
     const parentByChild = new Map<number, number>();
-    const parentIdsByChild = new Map<number, number[]>();
     for (const relation of directParentRelations) {
       if (!parentByChild.has(relation.relatedUnitId)) {
         parentByChild.set(relation.relatedUnitId, relation.unitId);
       }
-
-      const parentIds = parentIdsByChild.get(relation.relatedUnitId) ?? [];
-      parentIds.push(relation.unitId);
-      parentIdsByChild.set(relation.relatedUnitId, parentIds);
     }
 
-    const emergencyUnitIds = new Set<number>();
-    const gdudUnitIds: number[] = [];
-    for (const unitId of uniqueUnitIds) {
-      const level = detailByUnit.get(unitId)?.unitLevelId ?? 0;
-      if (level === 4) {
-        emergencyUnitIds.add(unitId);
-        gdudUnitIds.push(unitId);
-      }
-    }
-
-    const queue = [...gdudUnitIds];
-    while (queue.length > 0) {
-      const childId = queue.shift();
-      if (!childId) continue;
-
-      const parentIds = parentIdsByChild.get(childId) ?? [];
-      for (const parentId of parentIds) {
-        if (emergencyUnitIds.has(parentId)) continue;
-        emergencyUnitIds.add(parentId);
-        queue.push(parentId);
-      }
-    }
+    const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, directParentRelations);
+    const connectedUnitIds = connectedRootUnitId
+      ? new Set([
+          connectedRootUnitId,
+          ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
+        ])
+      : null;
 
     const units = uniqueUnitIds.map((unitId): UnitHierarchyNode => {
       const detail = detailByUnit.get(unitId);
@@ -321,6 +266,12 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isEmergencyUnit: emergencyUnitIds.has(unitId),
+        ...(connectedUnitIds
+          ? {
+              isConnectedToRoot: connectedUnitIds.has(unitId),
+              isRootUnit: unitId === connectedRootUnitId,
+            }
+          : {}),
         status,
         parent,
       };
