@@ -8,6 +8,7 @@ export type UnitHierarchyNode = {
   description: string;
   level: number;
   simul: string;
+  isConnectedToRoot?: boolean;
   isEmergencyUnit: boolean;
   parent?: UnitHierarchyParent | null;
   status: UnitStatus;

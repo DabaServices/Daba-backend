@@ -360,6 +360,49 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /units/lower-levels:
+    get:
+      tags: [UnitsHierarchy]
+      summary: Fetch lower-level units
+      description: Returns up to ten lower-level units for the screen unit with hierarchy-style unit fields.
+      parameters:
+        - $ref: '#/components/parameters/ScreenDateHeader'
+        - $ref: '#/components/parameters/UserHeader'
+        - $ref: '#/components/parameters/OptionalUnitHeader'
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            maximum: 10
+            default: 10
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: isConnectedToRoot
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lower-level units fetched.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnitsHierarchyResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
   /units/hierarchy:
     get:
       tags: [UnitsHierarchy]
@@ -698,6 +741,8 @@ components:
         simul:
           type: string
         isEmergencyUnit:
+          type: boolean
+        isConnectedToRoot:
           type: boolean
         status:
           $ref: '#/components/schemas/UnitStatus'
