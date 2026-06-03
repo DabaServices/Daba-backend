@@ -2,6 +2,7 @@ import type { Material } from "../../../material-entities/material/material.mode
 import type { StandardGroup } from "../../../standard-entities/standard-group/standard-group.model";
 import type { Report } from "../report.model";
 import type { Unit } from "../../../unit-entities/unit/unit.model";
+import type { UnitId } from "../../../unit-entities/unit-id/unit-id.model";
 import type {
     FavoriteReportDto,
     MaterialDto,
@@ -15,10 +16,12 @@ import type {
 import { MATERIAL_TYPES, RECORD_STATUS, REPORT_TYPES } from "../../../../constants";
 import { UnitRelation } from "../../../unit-entities/unit-relations/unit-relation.model";
 import { isDefined, isNullish } from "remeda";
+import { log } from "util";
 
 type FetchReportsParams = {
     screenUnitId: number;
     reports: Report[] | null | undefined;
+    standaloneComments?: StandaloneComment[] | null | undefined;
     yesterdayInventoryReports?: Report[] | null | undefined;
     screenAllocationReports?: Report[] | null | undefined;
     fetchQuantity?: boolean;
@@ -30,6 +33,14 @@ type ReportItemAggregate = {
     unit: UnitDto;
     allocatedQuantity: number | null;
     type: ReportItemTypeDto;
+};
+
+type MaterialComment = NonNullable<Material["comments"]>[number];
+type StandaloneComment = MaterialComment & {
+    material?: Material;
+    standardGroup?: StandardGroup;
+    unit?: UnitId;
+    recipientUnit?: UnitId;
 };
 
 const DEFAULT_STATUS: UnitStatusDto = {
@@ -68,8 +79,7 @@ const toParentUnitDto = (parent: UnitDto | null): UnitDto | null =>
 
 const getStandardGroupCategory = (standardGroup?: StandardGroup) =>
     standardGroup?.categoryGroup?.categoryDesc?.description
-    ?? standardGroup?.groupType
-    ?? "";
+    ?? standardGroup?.groupType ?? 'כללי';
 
 const getToolCategory = (material?: Material) =>
     material?.standardGroupMaterials
@@ -99,27 +109,57 @@ const buildMaterialDto = (
     category: getMaterialCategory(material, standardGroup),
     unitOfMeasure: material?.unitOfMeasurement ?? "יח",
     type: !isNullish(material)
-        ? material.type
+        ? material.type ?? MATERIAL_TYPES.ITEM
         : isDefined(standardGroup)
-            ? standardGroup.groupType
+            ? standardGroup?.groupType ?? 'כללי'
             : MATERIAL_TYPES.ITEM,
 });
+
+const getCommentUnitId = (comment: MaterialComment) =>
+    comment.dataValues?.unitId ?? comment.unitId;
+
+const getCommentRecipientUnitId = (comment: MaterialComment) =>
+    comment.dataValues?.recipientUnitId ?? comment.recipientUnitId;
+
+const getCommentMaterialId = (comment: MaterialComment) =>
+    comment.dataValues?.materialId ?? comment.materialId;
+
+const getCommentType = (comment: MaterialComment) =>
+    comment.dataValues?.type ?? comment.type;
+
+const getCommentText = (comment: MaterialComment) =>
+    comment.dataValues?.text ?? comment.text ?? "";
 
 const resolveCommentByAuthor = (
     comments: Material["comments"] | undefined,
     authorUnitId: number,
     scopedRecipientUnitId: number | null | undefined
-) =>
-    comments?.find((comment) =>
-        comment.dataValues.unitId === authorUnitId &&
-        comment.dataValues.recipientUnitId === scopedRecipientUnitId &&
-        Boolean(comment.dataValues.text)
-    )?.dataValues.text
-    ?? comments?.find((comment) =>
-        comment.dataValues.unitId === authorUnitId &&
-        Boolean(comment.dataValues.text)
-    )?.dataValues.text
-    ?? "";
+): string => {
+    const comment = comments?.find((comment) =>
+        getCommentUnitId(comment) === authorUnitId &&
+        getCommentRecipientUnitId(comment) === scopedRecipientUnitId &&
+        Boolean(getCommentText(comment))
+    );
+
+    return comment ? getCommentText(comment) : "";
+};
+
+const addReportComment = (
+    reportCommentsByMaterial: Map<string, Map<number, string>>,
+    materialId: string,
+    reportTypeId: number,
+    commentText: string
+) => {
+    let commentsByType = reportCommentsByMaterial.get(materialId);
+    if (!commentsByType) {
+        commentsByType = new Map<number, string>();
+        reportCommentsByMaterial.set(materialId, commentsByType);
+    }
+
+    if (!commentsByType.has(reportTypeId)) {
+        commentsByType.set(reportTypeId, commentText);
+    }
+};
 
 const buildYesterdayInventoryQuantityByUnitMaterial = (
     yesterdayInventoryReports: Report[] | null | undefined
@@ -145,11 +185,12 @@ const buildYesterdayInventoryQuantityByUnitMaterial = (
 export const buildReportsResponse = ({
     screenUnitId,
     reports,
+    standaloneComments,
     yesterdayInventoryReports,
     screenAllocationReports,
     fetchQuantity = true
 }: FetchReportsParams): ReportDto[] => {
-    if (!reports?.length && !yesterdayInventoryReports?.length && !screenAllocationReports?.length) return [];
+    if (!reports?.length && !standaloneComments?.length && !yesterdayInventoryReports?.length && !screenAllocationReports?.length) return [];
 
     const materialById = new Map<string, MaterialDto>();
     const itemByKey = new Map<string, ReportItemAggregate>();
@@ -217,26 +258,44 @@ export const buildReportsResponse = ({
                 materialById.set(item.materialId, buildMaterialDto(item.materialId, item.material, item.standardGroup));
             }
 
-            const screenUnitComment = item.material?.comments?.find(comment => comment.unitId === screenUnitId)?.text ?? '';
+            const screenUnitCommentText = !isAllocationReport
+                ? resolveCommentByAuthor(
+                    item.material?.comments,
+                    screenUnitId,
+                    report.recipientUnitId
+                )
+                : '';
 
-            if (screenUnitComment) {
-                let commentsByType = reportCommentsByMaterial.get(item.materialId);
-                if (!commentsByType) {
-                    commentsByType = new Map<number, string>();
-                    reportCommentsByMaterial.set(item.materialId, commentsByType);
-                }
-
-                if (!commentsByType.has(report.reportTypeId)) {
-                    commentsByType.set(report.reportTypeId, screenUnitComment);
-                }
+            if (!isAllocationReport && screenUnitCommentText) {
+                addReportComment(reportCommentsByMaterial, item.materialId, report.reportTypeId, screenUnitCommentText);
             }
 
-            const childUnitComment = report.recipientUnitId === screenUnitId
+            const incomingAllocationComment = isAllocationReport && report.recipientUnitId === screenUnitId
                 ? resolveCommentByAuthor(
                     item.material?.comments,
                     report.unitId,
                     report.recipientUnitId
-                ) : "";
+                )
+                : "";
+
+            if (incomingAllocationComment) {
+                addReportComment(reportCommentsByMaterial, item.materialId, REPORT_TYPES.ALLOCATION, incomingAllocationComment);
+            }
+
+            const childUnitComment = report.recipientUnitId === screenUnitId
+                ? isAllocationReport
+                    ? ""
+                    : resolveCommentByAuthor(
+                        item.material?.comments,
+                        report.unitId,
+                        report.recipientUnitId
+                    ) : isAllocationReport
+                    ? resolveCommentByAuthor(
+                        item.material?.comments,
+                        report.unitId,
+                        report.recipientUnitId ?? screenUnitId
+                    )
+                    : "";
 
             const key = `${isAllocationReport ? report.recipientUnitId ?? screenUnitId : report.unitId}:${item.materialId}:${report.reportTypeId}:${report.recipientUnitId ?? 0}`;
 
@@ -312,6 +371,81 @@ export const buildReportsResponse = ({
                 },
             });
         }
+    }
+
+    for (const comment of standaloneComments ?? []) {
+        const materialId = getCommentMaterialId(comment);
+        const reportTypeId = getCommentType(comment);
+        const commentText = getCommentText(comment);
+        const commentUnitId = getCommentUnitId(comment);
+        const commentRecipientUnitId = getCommentRecipientUnitId(comment);
+
+        if (!materialId || isNullish(reportTypeId) || !commentText || !commentUnitId) {
+            continue;
+        }
+
+        if (!materialById.has(materialId)) {
+            materialById.set(materialId, buildMaterialDto(materialId, comment.material, comment.standardGroup));
+        }
+
+        if (reportTypeId === REPORT_TYPES.ALLOCATION && commentRecipientUnitId === screenUnitId) {
+            addReportComment(reportCommentsByMaterial, materialId, reportTypeId, commentText);
+            continue;
+        }
+
+        if (reportTypeId !== REPORT_TYPES.ALLOCATION && commentUnitId === screenUnitId) {
+            addReportComment(reportCommentsByMaterial, materialId, reportTypeId, commentText);
+            continue;
+        }
+
+        const isAllocationComment = reportTypeId === REPORT_TYPES.ALLOCATION;
+        const itemUnitId = isAllocationComment
+            ? commentRecipientUnitId
+            : commentUnitId;
+
+        if (!itemUnitId) {
+            continue;
+        }
+
+        const itemUnitAssociation = isAllocationComment ? comment.recipientUnit : comment.unit;
+        const parentUnitAssociation = isAllocationComment ? comment.unit : comment.recipientUnit;
+        const parentUnitId = isAllocationComment ? commentUnitId : commentRecipientUnitId ?? screenUnitId;
+        const parentUnit = buildUnitDto(
+            parentUnitId,
+            parentUnitAssociation?.details?.[0],
+            null,
+            parentUnitAssociation?.unitStatus?.[0]?.unitStatus
+        );
+        const itemUnit = buildUnitDto(
+            itemUnitId,
+            itemUnitAssociation?.details?.[0],
+            toParentUnitDto(parentUnit),
+            itemUnitAssociation?.unitStatus?.[0]?.unitStatus
+        );
+        const key = `${itemUnitId}:${materialId}:${reportTypeId}:${commentRecipientUnitId ?? 0}`;
+        const existingItem = itemByKey.get(key);
+
+        if (existingItem) {
+            existingItem.type.comment = commentText;
+            continue;
+        }
+
+        itemByKey.set(key, {
+            materialId,
+            unitId: itemUnitId,
+            unit: itemUnit,
+            allocatedQuantity: isAllocationComment ? 0 : null,
+            type: {
+                id: reportTypeId,
+                quantity: 0,
+                availableQuantityToEat: 0,
+                yesterdayInventoryQuantity: reportTypeId === REPORT_TYPES.INVENTORY
+                    ? (yesterdayInventoryQuantityByUnitMaterial.get(`${itemUnitId}:${materialId}`) ?? 0)
+                    : null,
+                comment: commentText,
+                status: RECORD_STATUS.ACTIVE,
+            },
+        });
     }
 
     const grouped = new Map<string, Map<number, ReportItemDto>>();

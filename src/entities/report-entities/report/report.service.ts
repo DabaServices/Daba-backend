@@ -144,9 +144,10 @@ export class ReportService {
     async fetchReports(date: string, screenUnitId: number): Promise<ReportDto[]> {
         const baseReports = await this.repository.fetchReportsData(date, screenUnitId);
 
-        const [allocationReports, screenAllocationReports] = await Promise.all([
+        const [allocationReports, screenAllocationReports, standaloneComments] = await Promise.all([
             this.repository.fetchAllocationReportsData(date, screenUnitId),
             this.repository.fetchIncomingAllocationReports(date, screenUnitId),
+            this.repository.fetchStandaloneCommentsData(date, screenUnitId),
         ]);
 
         const reports = [...baseReports, ...allocationReports, ...screenAllocationReports];
@@ -167,6 +168,7 @@ export class ReportService {
         return buildReportsResponse({
             screenUnitId,
             reports,
+            standaloneComments,
             yesterdayInventoryReports: latestInventoryReports,
             screenAllocationReports,
         });

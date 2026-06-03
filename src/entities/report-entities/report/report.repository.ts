@@ -1,7 +1,7 @@
 import { BadGatewayException, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { isEmpty, isNullish } from "remeda";
-import { col, Op, QueryTypes, where } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import { MATERIAL_TYPES, OBJECT_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_RELATION_TYPES, UNIT_STATUSES } from "../../../constants";
 import { MainCategory } from "../../material-entities/categories/categories.model";
@@ -16,6 +16,7 @@ import { UnitId } from "../../unit-entities/unit-id/unit-id.model";
 import { UnitRelation } from "../../unit-entities/unit-relations/unit-relation.model";
 import { UnitStatus } from "../../unit-entities/units-statuses/units-statuses.model";
 import { formatDate } from "../../../utils/date";
+import { Comment } from "../comment/comment.model";
 import { IReportItem, ReportItem } from "../report-item/report-item.model";
 import { IReport, Report } from "./report.model";
 import { MaterialDto, ReportChanges, ReportItemConflictField } from "./report.types";
@@ -73,7 +74,8 @@ export class ReportRepository {
         @InjectModel(UnitRelation) private readonly unitRelationModel: typeof UnitRelation,
         @InjectModel(Material) private readonly materialModel: typeof Material,
         @InjectModel(MaterialStandardGroup) private readonly materialStandardGroupModel: typeof MaterialStandardGroup,
-        @InjectModel(StandardGroup) private readonly standardGroupModel: typeof StandardGroup) { }
+        @InjectModel(StandardGroup) private readonly standardGroupModel: typeof StandardGroup,
+        @InjectModel(Comment) private readonly commentModel: typeof Comment) { }
 
     async saveReports<Key extends ReportItemConflictField>({
         reportsToSave,
@@ -517,6 +519,148 @@ export class ReportRepository {
         });
     }
 
+    async fetchStandaloneCommentsData(
+        date: string,
+        recipientUnitId: number
+    ): Promise<Comment[]> {
+        const { unitIds } = await this.buildReportScope(date, recipientUnitId);
+        const comments = await this.commentModel.findAll({
+            where: {
+                date: new Date(date),
+                [Op.and]: [
+                    { text: { [Op.ne]: null } },
+                    { text: { [Op.ne]: "" } },
+                    {
+                        [Op.or]: [
+                            {
+                                type: { [Op.ne]: REPORT_TYPES.ALLOCATION },
+                                unitId: { [Op.in]: unitIds },
+                                recipientUnitId,
+                            },
+                            {
+                                type: { [Op.ne]: REPORT_TYPES.ALLOCATION },
+                                unitId: recipientUnitId,
+                            },
+                            {
+                                type: REPORT_TYPES.ALLOCATION,
+                                recipientUnitId,
+                            },
+                            {
+                                type: REPORT_TYPES.ALLOCATION,
+                                unitId: recipientUnitId,
+                                recipientUnitId: { [Op.in]: unitIds },
+                            },
+                        ],
+                    },
+                ],
+            },
+            include: [{
+                association: "unit",
+                required: false,
+                include: [{
+                    association: "details",
+                    required: false,
+                    attributes: ["unitId", "description", "unitLevelId", "startDate", "tsavIrgunCodeId"],
+                    where: {
+                        startDate: { [Op.lte]: date },
+                        endDate: { [Op.gt]: date },
+                        objectType: OBJECT_TYPES.UNIT,
+                    }
+                }, {
+                    association: "unitStatus",
+                    required: false,
+                    attributes: ["unitStatusId", "date"],
+                    where: {
+                        date,
+                    },
+                    include: [{
+                        association: "unitStatus",
+                        attributes: ["id", "description"],
+                    }],
+                }]
+            }, {
+                association: "recipientUnit",
+                required: false,
+                include: [{
+                    association: "details",
+                    required: false,
+                    attributes: ["unitId", "description", "unitLevelId", "startDate", "tsavIrgunCodeId"],
+                    where: {
+                        startDate: { [Op.lte]: date },
+                        endDate: { [Op.gt]: date },
+                        objectType: OBJECT_TYPES.UNIT,
+                    }
+                }, {
+                    association: "unitStatus",
+                    required: false,
+                    attributes: ["unitStatusId", "date"],
+                    where: {
+                        date,
+                    },
+                    include: [{
+                        association: "unitStatus",
+                        attributes: ["id", "description"],
+                    }],
+                }]
+            }, {
+                association: "material",
+                required: false,
+                include: [{
+                    model: MaterialNickname,
+                    as: "nickname",
+                    required: false,
+                }, {
+                    model: MaterialCategory,
+                    as: "materialCategory",
+                    required: false,
+                    include: [{
+                        model: MainCategory,
+                        as: "mainCategory",
+                        required: false,
+                    }],
+                },
+                getMaterialStandardGroupInclude()],
+            }],
+        });
+
+        const standardGroupIds = Array.from(new Set(
+            comments
+                .filter(comment => !comment.material)
+                .map(comment => comment.materialId)
+        ));
+
+        if (standardGroupIds.length === 0) {
+            return comments;
+        }
+
+        const standardGroups = await this.standardGroupModel.findAll({
+            include: [{
+                association: "nickname",
+                required: false,
+            }, {
+                association: "categoryGroup",
+                required: false,
+                include: [{
+                    association: "categoryDesc",
+                    attributes: ["id", "description"],
+                    required: false,
+                }]
+            }],
+            where: {
+                id: { [Op.in]: standardGroupIds }
+            }
+        });
+        const standardGroupById = new Map(standardGroups.map(standardGroup => [standardGroup.id, standardGroup]));
+
+        comments.forEach(comment => {
+            if (!comment.material) {
+                (comment as Comment & { standardGroup?: StandardGroup }).standardGroup = standardGroupById.get(comment.materialId);
+            }
+        });
+
+        return comments;
+    }
+
     async fetchOutgoingAllocationReports(
         date: string,
         unitId: number,
@@ -812,6 +956,7 @@ export class ReportRepository {
         const materialFilter = materialIds.length > 0
             ? { [Op.in]: materialIds }
             : { [Op.iLike]: `%${material}%` };
+        console.log({ materialFilter });
 
         return [{
             association: "unit",
@@ -870,22 +1015,6 @@ export class ReportRepository {
                 as: "material",
                 required: false,
                 include: [{
-                    association: "comments",
-                    required: false,
-                    on: {
-                        [Op.and]: [
-                            where(col("items->material->comments.type"), Op.eq, col("Report.report_type_id")),
-                            where(col("items->material->comments.material_id"), Op.eq, col("items.material_id")),
-                            where(col("items->material->comments.date"), Op.eq, col("Report.created_on")),
-                            {
-                                [Op.or]: [
-                                    where(col("items->material->comments.unit_id"), Op.eq, col("Report.unit_id")),
-                                    where(col("items->material->comments.unit_id"), Op.eq, col("Report.recipient_unit_id")),
-                                ]
-                            }
-                        ]
-                    }
-                }, {
                     model: MaterialNickname,
                     as: "nickname",
                     required: false,
