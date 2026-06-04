@@ -5,18 +5,22 @@ import { MATERIAL_TYPES } from "../../../constants";
 import { Material } from "./material.model";
 import { MaterialRepository } from "./material.repository";
 import { PastedMaterialsDto } from "./material.types";
+import { StandardGroup } from "src/entities/standard-entities/standard-group/standard-group.model";
 
-const getMaterialCategory = (material: Material, fallbackToCategoryId = false) => {
+const getMaterialCategory = (material: Material) => {
     const type = material.dataValues.type;
 
     if (type === MATERIAL_TYPES.TOOL) {
         return material.standardGroupMaterials
             ?.find((standardGroupMaterial) => standardGroupMaterial.standardGroup?.categoryGroup?.categoryDesc?.description)
-            ?.standardGroup?.categoryGroup?.categoryDesc?.description ?? "";
+            ?.standardGroup?.categoryGroup?.categoryDesc?.description ?? "כללי";
     }
 
-    return material.materialCategory?.mainCategory?.dataValues?.description ?? '';
+    return material.materialCategory?.mainCategory?.dataValues?.description ?? 'כללי';
 };
+
+const getGroupCategory = (group: StandardGroup) =>
+    group.categoryGroup?.categoryDesc?.description ?? 'כללי'
 
 @Injectable()
 export class MaterialService {
@@ -31,7 +35,7 @@ export class MaterialService {
             unitOfMeasure: 'יח',
             multiply: 0,
             nickname: group.nickname?.nickname ?? "",
-            category: group.categoryGroup?.categoryDesc?.description ?? '',
+            category: getGroupCategory(group),
             type: group.groupType,
         }));
 
@@ -41,7 +45,7 @@ export class MaterialService {
             unitOfMeasure: material.dataValues.unitOfMeasurement,
             multiply: material.dataValues.multiply,
             nickname: material.nickname?.dataValues.nickname,
-            category: getMaterialCategory(material, true),
+            category: getMaterialCategory(material),
             type: material.dataValues.type
         }));
 
@@ -82,7 +86,7 @@ export class MaterialService {
             description: group.name,
             favorite: favoriteIds.has(group.id),
             type: group.groupType,
-            category: group.categoryGroup?.categoryDesc?.description ?? '',
+            category: getGroupCategory(group),
             nickname: group.nickname?.nickname ?? "",
             unitOfMeasure: 'יח',
             multiply: 0,
@@ -121,7 +125,7 @@ export class MaterialService {
             description: group.name,
             favorite: favoriteIds.has(group.id),
             type: group.groupType,
-            category: group.categoryGroup?.categoryDesc?.description ?? '',
+            category: getGroupCategory(group),
             nickname: group.nickname?.nickname ?? "",
             unitOfMeasure: null,
             multiply: 0,

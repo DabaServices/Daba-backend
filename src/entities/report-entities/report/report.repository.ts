@@ -956,7 +956,6 @@ export class ReportRepository {
         const materialFilter = materialIds.length > 0
             ? { [Op.in]: materialIds }
             : { [Op.iLike]: `%${material}%` };
-        console.log({ materialFilter });
 
         return [{
             association: "unit",
