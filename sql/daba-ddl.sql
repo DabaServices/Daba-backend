@@ -290,6 +290,14 @@ CREATE SEQUENCE shoval.reports_id_seq
     NO MAXVALUE
     CACHE 1;
 
+CREATE SEQUENCE shoval.draft_reports_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
 ALTER SEQUENCE shoval.reports_id_seq OWNED BY shoval.reports.id;
 
 CREATE TABLE shoval.reports (
@@ -332,6 +340,46 @@ CREATE TABLE shoval.report_items (
     CONSTRAINT reportitems_reporting_level_fkey FOREIGN KEY (reporting_level) REFERENCES shoval.unit_levels(id) ON DELETE CASCADE,
     CONSTRAINT reportitems_reporting_unit_fkey FOREIGN KEY (reporting_unit) REFERENCES shoval.units_ids(id) ON DELETE CASCADE,
     CONSTRAINT reportitems_status_fkey FOREIGN KEY (status) REFERENCES shoval.record_statuses(id) ON DELETE CASCADE
+);
+
+CREATE TABLE shoval.draft_reports (
+    id integer SERIAL,
+    report_type_id integer NOT NULL,
+    unit_id integer NOT NULL,
+    unit_object_type character varying(2) NOT NULL,
+    recipient_unit_id integer,
+    recipient_unit_object_type character varying(2) NOT NULL,
+    reporter_unit_id integer,
+    reporter_unit_object_type character varying(2) NOT NULL,
+    created_on date,
+    created_at time without time zone,
+    created_by character varying(20),
+    CONSTRAINT reports_pkey PRIMARY KEY (id),
+    CONSTRAINT reports_recipient_unit_id_fkey FOREIGN KEY (recipient_unit_id) REFERENCES shoval.units_ids(id) ON DELETE CASCADE,
+    CONSTRAINT reports_report_type_id_fkey FOREIGN KEY (report_type_id) REFERENCES shoval.report_types(id) ON DELETE CASCADE,
+    CONSTRAINT reports_reporter_unit_id_fkey FOREIGN KEY (reporter_unit_id) REFERENCES shoval.units_ids(id) ON DELETE CASCADE,
+    CONSTRAINT reports_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES shoval.units_ids(id) ON DELETE CASCADE
+);
+
+CREATE TABLE shoval.draft_report_items (
+    draft_id SERIAL,
+    draft_item integer NOT NULL,
+    material_description character varying(255),
+    material_id character varying(18),
+    center_id integer,
+    reporting_level integer NOT NULL,
+    reporting_unit integer NOT NULL,
+    reporting_unit_object_type character varying(2) NOT NULL,
+    reported_quantity numeric not null,
+    changed_at time without time zone not null,
+    changed_by character varying(20) not null,
+    modified_at timestamp without time zone not null,
+    report_id integer,
+    status character varying(20),
+    CONSTRAINT draftreportitems_pkey PRIMARY KEY (draft_id, draft_item),
+    CONSTRAINT draftreportitems_draft_id_fkey FOREIGN KEY (id) REFERENCES shoval.draft_reports(id) ON DELETE CASCADE,
+    CONSTRAINT draftreportitems_center_id_fkey FOREIGN KEY (id) REFERENCES shoval.supply_centers(id) ON DELETE CASCADE,
+    CONSTRAINT draftreportitems_material_id_fkey FOREIGN KEY (id) REFERENCES shoval.materials(id) ON DELETE CASCADE
 );
 
 CREATE TABLE shoval.stocks (

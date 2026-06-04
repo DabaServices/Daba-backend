@@ -22,6 +22,90 @@ const getMaterialCategory = (material: Material) => {
 const getGroupCategory = (group: StandardGroup) =>
     group.categoryGroup?.categoryDesc?.description ?? 'כללי'
 
+type SearchableMaterial = {
+    id: string | number;
+    description?: string | null;
+    nickname?: string | null;
+    favorite?: boolean;
+};
+
+const normalizeSearchValue = (value: unknown) =>
+    String(value ?? '').trim().toLowerCase();
+
+const normalizeMaterialId = (value: unknown) => {
+    const normalizedValue = normalizeSearchValue(value);
+    return /^\d+$/.test(normalizedValue)
+        ? normalizedValue.replace(/^0+/, '') || '0'
+        : normalizedValue;
+};
+
+const SEARCH_RANK = {
+    PREFIX: 1_000_000,
+    CONTAINS: 2_000_000,
+    MISSING: Number.MAX_SAFE_INTEGER
+} as const;
+
+const getTextSearchRank = (value: unknown, normalizedFilter: string, fieldOffset: number) => {
+    const normalizedValue = normalizeSearchValue(value);
+
+    if (!normalizedValue || !normalizedFilter) {
+        return SEARCH_RANK.MISSING;
+    }
+
+    const matchIndex = normalizedValue.indexOf(normalizedFilter);
+
+    if (matchIndex === -1) {
+        return SEARCH_RANK.MISSING;
+    }
+
+    const lengthDiff = normalizedValue.length - normalizedFilter.length;
+
+    if (normalizedValue === normalizedFilter) {
+        return fieldOffset;
+    }
+
+    if (matchIndex === 0) {
+        return SEARCH_RANK.PREFIX + lengthDiff * 100 + fieldOffset;
+    }
+
+    return SEARCH_RANK.CONTAINS + matchIndex * 1_000 + lengthDiff * 100 + fieldOffset;
+};
+
+const getIdSearchRank = (value: unknown, normalizedFilter: string) => {
+    const normalizedFilterId = normalizeMaterialId(normalizedFilter);
+
+    return Math.min(
+        getTextSearchRank(value, normalizedFilter, 0),
+        getTextSearchRank(normalizeMaterialId(value), normalizedFilterId, 0)
+    );
+};
+
+const getMaterialSearchRank = (material: SearchableMaterial, normalizedFilter: string) => Math.min(
+    getIdSearchRank(material.id, normalizedFilter),
+    getTextSearchRank(material.description, normalizedFilter, 1),
+    getTextSearchRank(material.nickname, normalizedFilter, 2)
+);
+
+const compareBySearchRank = (filter: string) => {
+    const normalizedFilter = normalizeSearchValue(filter);
+
+    return (a: SearchableMaterial, b: SearchableMaterial) => {
+        if (a.favorite !== b.favorite) {
+            return a.favorite ? -1 : 1;
+        }
+
+        if (normalizedFilter) {
+            const rankDiff = getMaterialSearchRank(a, normalizedFilter) - getMaterialSearchRank(b, normalizedFilter);
+
+            if (rankDiff !== 0) {
+                return rankDiff;
+            }
+        }
+
+        return String(a.id).localeCompare(String(b.id));
+    };
+};
+
 @Injectable()
 export class MaterialService {
     constructor(private readonly repository: MaterialRepository) { }
@@ -96,12 +180,7 @@ export class MaterialService {
         }));
 
         return [...materialResults, ...standardGroupResults]
-            .sort((a, b) => {
-                if (a.favorite !== b.favorite) {
-                    return a.favorite ? -1 : 1;
-                }
-                return String(a.id).localeCompare(String(b.id));
-            })
+            .sort(compareBySearchRank(filter))
             .slice(0, 20);
     }
 

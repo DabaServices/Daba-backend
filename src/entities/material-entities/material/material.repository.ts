@@ -166,6 +166,8 @@ export class MaterialRepository {
     }
 
     async fetchBySearch(filter: string, unitId: number) {
+        const searchFilter = filter ?? '';
+
         const materials = await this.materialModel.findAll({
             include: [{
                 attributes: ["materialId"],
@@ -191,8 +193,9 @@ export class MaterialRepository {
                 [Op.and]: [
                     {
                         [Op.or]: [
-                            { id: { [Op.iLike]: `%${filter}%` } },
-                            { description: { [Op.iLike]: `%${filter}%` } }
+                            { id: { [Op.iLike]: `%${searchFilter}%` } },
+                            { description: { [Op.iLike]: `%${searchFilter}%` } },
+                            { '$nickname.nickname$': { [Op.iLike]: `%${searchFilter}%` } }
                         ],
                     },
                     getMaterialSupplyCenterTypeWhere(),
@@ -217,8 +220,9 @@ export class MaterialRepository {
             }],
             where: {
                 [Op.or]: [
-                    { id: { [Op.iLike]: `%${filter}%` } },
-                    { name: { [Op.iLike]: `%${filter}%` } }
+                    { id: { [Op.iLike]: `%${searchFilter}%` } },
+                    { name: { [Op.iLike]: `%${searchFilter}%` } },
+                    { '$nickname.nickname$': { [Op.iLike]: `%${searchFilter}%` } }
                 ],
                 groupType: {
                     [Op.in]: [MATERIAL_TYPES.ITEM, MATERIAL_TYPES.TOOL]
@@ -229,12 +233,13 @@ export class MaterialRepository {
 
         const materialIds = materials.map(material => material.id);
         const groupsIds = standardGroups.map(group => group.id);
+        const searchResultIds = [...materialIds, ...groupsIds];
 
-        const comments = materialIds.length === 0
+        const comments = searchResultIds.length === 0
             ? []
             : await this.commentModel.findAll({
                 where: {
-                    materialId: { [Op.in]: [...materialIds, ...groupsIds] },
+                    materialId: { [Op.in]: searchResultIds },
                     [Op.or]: [
                         { unitId },
                         { recipientUnitId: unitId }
