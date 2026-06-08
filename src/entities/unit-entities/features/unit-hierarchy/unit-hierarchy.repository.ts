@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { isDefined } from "remeda";
 import { Op, Sequelize, Transaction } from "sequelize";
-import { OBJECT_TYPES, UNIT_RELATION_TYPES } from "../../../../constants";
+import { OBJECT_TYPES, UNIT_LEVELS, UNIT_RELATION_TYPES } from "../../../../constants";
 import { UnitId } from "../../unit-id/unit-id.model";
 import { UnitRelation } from "../../unit-relations/unit-relation.model";
 import { UnitStatusType } from "../../unit-status-type/unit-status-type.model";
@@ -166,15 +166,15 @@ export class UnitHierarchyRepository {
       unitLevelId: { [Op.gt]: currentLevel },
       ...(normalizedFilter
         ? {
-            [Op.or]: [
-              { description: { [Op.iLike]: `%${normalizedFilter}%` } },
-              { tsavIrgunCodeId: { [Op.iLike]: `%${normalizedFilter}%` } },
-              Sequelize.where(
-                Sequelize.cast(Sequelize.col("unit_id"), "TEXT"),
-                { [Op.iLike]: `%${normalizedFilter}%` },
-              ),
-            ],
-          }
+          [Op.or]: [
+            { description: { [Op.iLike]: `%${normalizedFilter}%` } },
+            { tsavIrgunCodeId: { [Op.iLike]: `%${normalizedFilter}%` } },
+            Sequelize.where(
+              Sequelize.cast(Sequelize.col("unit_id"), "TEXT"),
+              { [Op.iLike]: `%${normalizedFilter}%` },
+            ),
+          ],
+        }
         : {}),
     };
 

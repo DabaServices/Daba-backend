@@ -165,7 +165,7 @@ export class MaterialService {
                 .sort((a, b) => a.type - b.type)
         }));
 
-        const standardGroupResults: Array<Record<string, any>> = standardGroups.map((group) => ({
+        const standardGroupResults = standardGroups.map((group) => ({
             id: group.id,
             description: group.name,
             favorite: favoriteIds.has(group.id),
@@ -199,7 +199,7 @@ export class MaterialService {
             type: material.dataValues.type,
             favorite: !isEmptyish(material.unitFavorites ?? []),
         }));
-        const standardGroupResults: Array<Record<string, any>> = standardGroups.map((group) => ({
+        const standardGroupResults = standardGroups.map((group) => ({
             id: group.id,
             description: group.name,
             favorite: favoriteIds.has(group.id),
