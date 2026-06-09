@@ -290,14 +290,6 @@ CREATE SEQUENCE shoval.reports_id_seq
     NO MAXVALUE
     CACHE 1;
 
-CREATE SEQUENCE shoval.draft_reports_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
 ALTER SEQUENCE shoval.reports_id_seq OWNED BY shoval.reports.id;
 
 CREATE TABLE shoval.reports (
@@ -342,8 +334,10 @@ CREATE TABLE shoval.report_items (
     CONSTRAINT reportitems_status_fkey FOREIGN KEY (status) REFERENCES shoval.record_statuses(id) ON DELETE CASCADE
 );
 
+CREATE SEQUENCE IF NOT EXISTS shoval.draft_reports_id_seq;
+
 CREATE TABLE shoval.draft_reports (
-    id integer SERIAL,
+    id integer not null default nextval('ddraft_reports_id_seq' :: regclass),
     report_type_id integer NOT NULL,
     unit_id integer NOT NULL,
     unit_object_type character varying(2) NOT NULL,
@@ -361,9 +355,13 @@ CREATE TABLE shoval.draft_reports (
     CONSTRAINT reports_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES shoval.units_ids(id) ON DELETE CASCADE
 );
 
+alter sequence shoval.draft_reports_id_seq owned by shoval.draft_reports.id;
+
+CREATE SEQUENCE IF NOT EXISTS shoval.draft_report_items_draft_items_seq;
+
 CREATE TABLE shoval.draft_report_items (
-    draft_id SERIAL,
-    draft_item integer NOT NULL,
+    draft_id integer not null,
+    draft_item integer NOT NULL default nextval('draft_report_items_draft_items_seq' :: regclass),
     material_description character varying(255),
     material_id character varying(18),
     center_id integer,
@@ -381,6 +379,12 @@ CREATE TABLE shoval.draft_report_items (
     CONSTRAINT draftreportitems_center_id_fkey FOREIGN KEY (id) REFERENCES shoval.supply_centers(id) ON DELETE CASCADE,
     CONSTRAINT draftreportitems_material_id_fkey FOREIGN KEY (id) REFERENCES shoval.materials(id) ON DELETE CASCADE
 );
+
+alter sequence shoval.draft_report_items_draft_items_seq owned by shoval.draft_report_items.draft_item;
+
+CREATE INDEX IF NOT EXISTS idx_draft_report_items_draft_id ON draft_report_items (draft_id);
+CREATE INDEX IF NOT EXISTS idx_draft_report_items_material_id ON draft_report_items (material_id);
+CREATE INDEX IF NOT EXISTS idx_draft_report_unit_id ON draft_reports (unit_id);
 
 CREATE TABLE shoval.stocks (
     material_id character varying(18) NOT NULL,
