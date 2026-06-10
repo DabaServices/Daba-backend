@@ -15,7 +15,7 @@ import type {
 } from "../report.types";
 import { MATERIAL_TYPES, RECORD_STATUS, REPORT_TYPES } from "../../../../constants";
 import { UnitRelation } from "../../../unit-entities/unit-relations/unit-relation.model";
-import { isDefined, isNullish } from "remeda";
+import { isDefined, isNullish, round } from "remeda";
 import { log } from "util";
 
 type FetchReportsParams = {
@@ -215,8 +215,8 @@ export const buildReportsResponse = ({
 
             quantityLeftToAllocateByMaterial.set(
                 item.materialId,
-                (quantityLeftToAllocateByMaterial.get(item.materialId) ?? 0)
-                + toNumber(item.balanceQuantity)
+                round((quantityLeftToAllocateByMaterial.get(item.materialId) ?? 0)
+                + toNumber(item.balanceQuantity), 3)
             );
         }
     }
