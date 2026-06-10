@@ -53,7 +53,7 @@ export class UnitHierarchyController {
 
     return this.service.getLowerLevelUnitsConnection(
       request?.["date"],
-      Number(request.headers["unit"]),
+      request.headers["username"] as string,
       {
         filter,
         limit: Number(limit),

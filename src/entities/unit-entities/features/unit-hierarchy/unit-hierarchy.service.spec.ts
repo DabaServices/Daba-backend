@@ -155,7 +155,7 @@ describe('UnitHierarchyService', () => {
       });
 
       await expect(
-        service.getLowerLevelUnitsConnection('2026-06-02', 2),
+        service.getLowerLevelUnitsConnection('2026-06-02', 'S9107544'),
       ).resolves.toEqual([
         {
           id: 3,
@@ -223,7 +223,7 @@ describe('UnitHierarchyService', () => {
       });
 
       await expect(
-        service.getLowerLevelUnitsConnection('2026-06-02', 2, { limit: 50 }),
+        service.getLowerLevelUnitsConnection('2026-06-02', 'S9107544', { limit: 50 }),
       ).resolves.toHaveLength(10);
     });
 
@@ -234,7 +234,7 @@ describe('UnitHierarchyService', () => {
       });
 
       await expect(
-        service.getLowerLevelUnitsConnection('2026-06-02', 0),
+        service.getLowerLevelUnitsConnection('2026-06-02', 'S9107544'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

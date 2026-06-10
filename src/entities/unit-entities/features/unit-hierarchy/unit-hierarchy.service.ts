@@ -384,7 +384,7 @@ export class UnitHierarchyService {
 
   async getLowerLevelUnitsConnection(
     date: string,
-    screenUnitId: number,
+    username: string,
     {
       filter = "",
       limit,
@@ -392,10 +392,12 @@ export class UnitHierarchyService {
       isConnectedToRoot,
     }: LowerLevelUnitsConnectionOptions = {},
   ): Promise<UnitHierarchyNode[]> {
-    if (!Number.isInteger(screenUnitId) || screenUnitId <= 0) {
+    const userUnit = await this.unitUserRepository.fetchUnitUser(username);
+    
+    if (!isDefined(userUnit?.unitId)) {
       throw new BadRequestException({
-        message: 'Missing screen unit',
-        type: MESSAGE_TYPES.FAILURE,
+        message: 'השמתמש לא מחובר ליחידה',
+        type: MESSAGE_TYPES.FATAL,
       });
     }
 
@@ -405,14 +407,13 @@ export class UnitHierarchyService {
     const detailByUnit = new Map<number, Unit>();
     for (const detail of unitDetails) {
       if (detail.dataValues.unitLevelId === UNIT_LEVELS.GDUD) continue;
-      
       if (!detailByUnit.has(detail.unitId)) {
         detailByUnit.set(detail.unitId, detail);
       }
     }
 
-    const screenUnit = detailByUnit.get(screenUnitId);
-    if (!screenUnit) {
+    const rootUnit = detailByUnit.get(userUnit.unitId);
+    if (!rootUnit) {
       throw new BadRequestException({
         message: 'Screen unit does not exist for the selected date',
         type: MESSAGE_TYPES.FAILURE,
@@ -424,7 +425,7 @@ export class UnitHierarchyService {
       Array.from(detailByUnit.keys()),
     );
     const connectedUnitIds = buildConnectedUnitIds(
-      screenUnitId,
+      rootUnit.unitId,
       activeRelations,
     );
     const matkalConnectedUnitIds = new Set([
@@ -438,7 +439,7 @@ export class UnitHierarchyService {
       }
     }
 
-    const screenUnitLevel = screenUnit.unitLevelId ?? 0;
+    const screenUnitLevel = rootUnit.unitLevelId ?? 0;
     const normalizedFilter = filter.trim().toLowerCase();
     const lowerUnitIds = Array.from(detailByUnit.keys())
       .filter((unitId) => {
