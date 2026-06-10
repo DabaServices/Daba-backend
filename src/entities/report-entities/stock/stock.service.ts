@@ -23,7 +23,7 @@ export class StockService {
     private readonly stockRepository: StockRepository,
     private readonly unitHierarchyService: UnitHierarchyService,
     private readonly materialStandardGroupRepository: MaterialStandardGroupRepository,
-  ) {}
+  ) { }
 
   async getMaterialStocks(unit: Number, date: string, material?: string) {
     const rootUnitChildrenHierarchy =
@@ -35,13 +35,16 @@ export class StockService {
     );
 
     const allRelatedUnitIds = visibleChildren.flatMap((rootUnitChild) =>
-      rootUnitChild.children
-        .filter(
-          (child) =>
-            child.level === UNIT_LEVELS.GDUD &&
-            child.status?.id !== UNIT_STATUSES.REQUESTING,
-        )
-        .map((child) => child.id),
+      rootUnitChild.level === UNIT_LEVELS.GDUD
+        && rootUnitChild.status.id !== UNIT_STATUSES.REQUESTING
+        ? rootUnitChild.id
+        : rootUnitChild.children
+          .filter(
+            (child) =>
+              child.level === UNIT_LEVELS.GDUD &&
+              child.status?.id !== UNIT_STATUSES.REQUESTING,
+          )
+          .map((child) => child.id),
     );
 
     if (Number(unit) === MATKAL_UNIT_ID) {
@@ -80,7 +83,9 @@ export class StockService {
 
     const rootUnitChildStocks = visibleChildren.map((rootUnitChild) => {
       const relatedUnitsId = new Set(
-        rootUnitChild.children.map((child) => child.id),
+        rootUnitChild.level === UNIT_LEVELS.GDUD
+          ? [rootUnitChild.id]
+          : rootUnitChild.children.map((child) => child.id),
       );
 
       const childUnitStocks = allStocks.filter((stock) =>
