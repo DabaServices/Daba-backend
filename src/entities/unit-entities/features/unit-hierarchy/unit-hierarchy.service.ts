@@ -157,7 +157,7 @@ export class UnitHierarchyService {
     private readonly unitStatusTypesRepository: UnitStatusRepository,
     private readonly reportRoutingRepository: ReportRoutingRepository,
     private readonly unitUserRepository: UserRepository,
-  ) {}
+  ) { }
 
   async getHierarchyForUser(
     username: string,
@@ -241,9 +241,9 @@ export class UnitHierarchyService {
     ]);
     const connectedUnitIds = connectedRootUnitId
       ? new Set([
-          connectedRootUnitId,
-          ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
-        ])
+        connectedRootUnitId,
+        ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
+      ])
       : null;
 
     const units = uniqueUnitIds.map((unitId): UnitHierarchyNode => {
@@ -254,14 +254,14 @@ export class UnitHierarchyService {
 
       const parent = parentId
         ? {
-            id: parentId,
-            description: detailByUnit.get(parentId)?.description ?? '',
-            level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
-            simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
-            status:
-              statusByUnit.get(parentId)?.unitStatus?.dataValues ??
-              DEFAULT_STATUS,
-          }
+          id: parentId,
+          description: detailByUnit.get(parentId)?.description ?? '',
+          level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
+          simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
+          status:
+            statusByUnit.get(parentId)?.unitStatus?.dataValues ??
+            DEFAULT_STATUS,
+        }
         : null;
 
       return {
@@ -273,9 +273,9 @@ export class UnitHierarchyService {
         isConnectedToMatkal: matkalConnectedUnitIds.has(unitId),
         ...(connectedUnitIds
           ? {
-              isConnectedToRoot: connectedUnitIds.has(unitId),
-              isRootUnit: unitId === connectedRootUnitId,
-            }
+            isConnectedToRoot: connectedUnitIds.has(unitId),
+            isRootUnit: unitId === connectedRootUnitId,
+          }
           : {}),
         status,
         parent,
@@ -351,16 +351,16 @@ export class UnitHierarchyService {
         const directParentId = parentByChild.get(unitId);
         const parentStatus = directParentId
           ? statusByUnit.get(directParentId)?.unitStatus?.dataValues ??
-            DEFAULT_STATUS
+          DEFAULT_STATUS
           : DEFAULT_STATUS;
         const parent = directParentId
           ? {
-              id: directParentId,
-              description: detailByUnit.get(directParentId)?.description ?? '',
-              level: detailByUnit.get(directParentId)?.unitLevelId ?? 0,
-              simul: detailByUnit.get(directParentId)?.tsavIrgunCodeId ?? '',
-              status: parentStatus,
-            }
+            id: directParentId,
+            description: detailByUnit.get(directParentId)?.description ?? '',
+            level: detailByUnit.get(directParentId)?.unitLevelId ?? 0,
+            simul: detailByUnit.get(directParentId)?.tsavIrgunCodeId ?? '',
+            status: parentStatus,
+          }
           : null;
 
         return {
@@ -404,6 +404,8 @@ export class UnitHierarchyService {
 
     const detailByUnit = new Map<number, Unit>();
     for (const detail of unitDetails) {
+      if (detail.dataValues.unitLevelId === UNIT_LEVELS.GDUD) continue;
+      
       if (!detailByUnit.has(detail.unitId)) {
         detailByUnit.set(detail.unitId, detail);
       }
@@ -501,14 +503,14 @@ export class UnitHierarchyService {
       const parentId = parentByChild.get(unitId);
       const parent = parentId
         ? {
-            id: parentId,
-            description: detailByUnit.get(parentId)?.description ?? '',
-            level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
-            simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
-            status:
-              statusByUnit.get(parentId)?.unitStatus?.dataValues ??
-              DEFAULT_STATUS,
-          }
+          id: parentId,
+          description: detailByUnit.get(parentId)?.description ?? '',
+          level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
+          simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
+          status:
+            statusByUnit.get(parentId)?.unitStatus?.dataValues ??
+            DEFAULT_STATUS,
+        }
         : null;
 
       return {
