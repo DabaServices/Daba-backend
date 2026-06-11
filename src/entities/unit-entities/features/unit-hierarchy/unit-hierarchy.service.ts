@@ -393,7 +393,7 @@ export class UnitHierarchyService {
     }: LowerLevelUnitsConnectionOptions = {},
   ): Promise<UnitHierarchyNode[]> {
     const userUnit = await this.unitUserRepository.fetchUnitUser(username);
-    
+
     if (!isDefined(userUnit?.unitId)) {
       throw new BadRequestException({
         message: 'השמתמש לא מחובר ליחידה',
@@ -441,6 +441,7 @@ export class UnitHierarchyService {
 
     const screenUnitLevel = rootUnit.unitLevelId ?? 0;
     const normalizedFilter = filter.trim().toLowerCase();
+    
     const lowerUnitIds = Array.from(detailByUnit.keys())
       .filter((unitId) => {
         const detail = detailByUnit.get(unitId);
@@ -448,10 +449,8 @@ export class UnitHierarchyService {
         if (unitLevel <= screenUnitLevel) return false;
 
         const isConnected = connectedUnitIds.has(unitId);
-        if (
-          isConnectedToRoot !== undefined &&
-          isConnected !== isConnectedToRoot
-        ) {
+
+        if (isConnectedToRoot && !isConnected) {
           return false;
         }
 
