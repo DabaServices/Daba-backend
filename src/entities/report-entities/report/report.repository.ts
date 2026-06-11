@@ -3,7 +3,16 @@ import { InjectModel } from "@nestjs/sequelize";
 import { isEmpty, isNullish } from "remeda";
 import { Op, QueryTypes } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
-import { MATERIAL_TYPES, OBJECT_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_RELATION_TYPES, UNIT_STATUSES } from "../../../constants";
+import {
+    MATERIAL_TYPES,
+    OBJECT_TYPES,
+    RECORD_STATUS,
+    REPORT_TYPES,
+    REPORTABLE_OBJECT_TYPES,
+    REPORTABLE_UNIT_RELATION_TYPES,
+    UNIT_RELATION_TYPES,
+    UNIT_STATUSES,
+} from "../../../constants";
 import { MainCategory } from "../../material-entities/categories/categories.model";
 import { MaterialCategory } from "../../material-entities/material-category/material-category.model";
 import { MaterialNickname } from "../../material-entities/material-nickname/material-nickname.model";
@@ -63,6 +72,9 @@ const getMaterialCategory = (material: Material) => {
 
     return material.materialCategory?.mainCategory?.description ?? "";
 };
+
+const reportableObjectTypesWhere = () => ({ [Op.in]: REPORTABLE_OBJECT_TYPES });
+const reportableRelationTypesWhere = () => ({ [Op.in]: REPORTABLE_UNIT_RELATION_TYPES });
 
 @Injectable()
 export class ReportRepository {
@@ -173,9 +185,9 @@ export class ReportRepository {
                     }]
                 }],
                 where: {
-                    unitRelationId: UNIT_RELATION_TYPES.ZRA,
-                    unitObjectType: OBJECT_TYPES.UNIT,
-                    relatedUnitObjectType: OBJECT_TYPES.UNIT,
+                    unitRelationId: reportableRelationTypesWhere(),
+                    unitObjectType: reportableObjectTypesWhere(),
+                    relatedUnitObjectType: reportableObjectTypesWhere(),
                     unitId: { [Op.in]: units },
                     startDate: { [Op.lte]: date },
                     endDate: { [Op.gt]: date }
@@ -217,9 +229,9 @@ export class ReportRepository {
                 reportTypeId: reportType,
                 createdOn: new Date(date),
                 unitId: { [Op.in]: units },
-                unitObjectType: OBJECT_TYPES.UNIT,
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
             }
         })
     }
@@ -238,9 +250,9 @@ export class ReportRepository {
                 reportTypeId: reportType,
                 createdOn: new Date(date),
                 unitId: { [Op.in]: unitIds },
-                unitObjectType: OBJECT_TYPES.UNIT,
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
             },
             include: [{
                 association: "items",
@@ -249,7 +261,7 @@ export class ReportRepository {
                 where: {
                     materialId: { [Op.in]: materialIds },
                     status: RECORD_STATUS.ACTIVE,
-                    reportingUnitObjectType: OBJECT_TYPES.UNIT,
+                    reportingUnitObjectType: reportableObjectTypesWhere(),
                 },
             }],
         });
@@ -292,9 +304,9 @@ export class ReportRepository {
                 reportTypeId: { [Op.in]: reportTypeIds },
                 createdOn: new Date(date),
                 unitId: { [Op.in]: unitIds },
-                unitObjectType: OBJECT_TYPES.UNIT,
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
             },
             include: [{
                 association: "items",
@@ -303,7 +315,7 @@ export class ReportRepository {
                 where: {
                     materialId: { [Op.in]: materialIds },
                     status: RECORD_STATUS.ACTIVE,
-                    reportingUnitObjectType: OBJECT_TYPES.UNIT,
+                    reportingUnitObjectType: reportableObjectTypesWhere(),
                 },
             }],
         });
@@ -346,16 +358,16 @@ export class ReportRepository {
                FROM (
                     SELECT id,
                            ROW_NUMBER() OVER (
-                               PARTITION BY unit_id
+                               PARTITION BY unit_id, unit_object_type
                                ORDER BY created_on DESC, created_at DESC, id DESC
                            ) AS row_number
                       FROM reports
                      WHERE report_type_id = :reportTypeId
                        AND created_on < :date
                        AND unit_id IN (:unitIds)
-                       AND unit_object_type = :unitObjectType
-                       AND recipient_unit_object_type = :unitObjectType
-                       AND reporter_unit_object_type = :unitObjectType
+                       AND unit_object_type IN (:reportableObjectTypes)
+                       AND recipient_unit_object_type IN (:reportableObjectTypes)
+                       AND reporter_unit_object_type IN (:reportableObjectTypes)
                ) latest_reports
               WHERE row_number = 1`,
             {
@@ -363,7 +375,7 @@ export class ReportRepository {
                     date,
                     reportTypeId,
                     unitIds,
-                    unitObjectType: OBJECT_TYPES.UNIT,
+                    reportableObjectTypes: REPORTABLE_OBJECT_TYPES,
                 },
                 type: QueryTypes.SELECT,
             }
@@ -419,7 +431,7 @@ export class ReportRepository {
                 where: {
                     materialId: { [Op.in]: materialIds },
                     status: RECORD_STATUS.ACTIVE,
-                    reportingUnitObjectType: OBJECT_TYPES.UNIT,
+                    reportingUnitObjectType: reportableObjectTypesWhere(),
                 },
             }],
         });
@@ -503,10 +515,10 @@ export class ReportRepository {
     ): Promise<Report[]> {
         return this.reportModel.findAll({
             where: {
-                unitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
                 recipientUnitId,
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
                 createdOn: date,
                 reportTypeId: REPORT_TYPES.ALLOCATION,
             },
@@ -564,7 +576,7 @@ export class ReportRepository {
                     where: {
                         startDate: { [Op.lte]: date },
                         endDate: { [Op.gt]: date },
-                        objectType: OBJECT_TYPES.UNIT,
+                        objectType: reportableObjectTypesWhere(),
                     }
                 }, {
                     association: "unitStatus",
@@ -588,7 +600,7 @@ export class ReportRepository {
                     where: {
                         startDate: { [Op.lte]: date },
                         endDate: { [Op.gt]: date },
-                        objectType: OBJECT_TYPES.UNIT,
+                        objectType: reportableObjectTypesWhere(),
                     }
                 }, {
                     association: "unitStatus",
@@ -809,10 +821,10 @@ export class ReportRepository {
         const latestCreatedOn: Date = await this.reportModel.max("createdOn", {
             where: {
                 unitId: { [Op.in]: descendantIds },
-                unitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
                 recipientUnitId: { [Op.in]: unitIds },
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
                 createdOn: { [Op.lt]: date },
                 reportTypeId: { [Op.in]: [REPORT_TYPES.REQUEST, REPORT_TYPES.INVENTORY, REPORT_TYPES.USAGE] }
             }
@@ -874,10 +886,10 @@ export class ReportRepository {
         return this.reportModel.findAll({
             where: {
                 unitId: { [Op.in]: unitIds },
-                unitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
                 recipientUnitId: { [Op.in]: unitIds },
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
                 createdOn: date,
                 reportTypeId: { [Op.in]: [REPORT_TYPES.REQUEST, REPORT_TYPES.INVENTORY, REPORT_TYPES.USAGE] },
             },
@@ -916,16 +928,16 @@ export class ReportRepository {
             createdOn: string;
             reportTypeId: { [Op.in]: number[] };
             unitId?: { [Op.in]: number[] };
-            unitObjectType: string;
+            unitObjectType: { [Op.in]: string[] };
             recipientUnitId?: { [Op.in]: number[] };
-            recipientUnitObjectType: string;
-            reporterUnitObjectType: string;
+            recipientUnitObjectType: { [Op.in]: string[] };
+            reporterUnitObjectType: { [Op.in]: string[] };
         } = {
             createdOn: date,
             reportTypeId: { [Op.in]: reportTypeIds },
-            unitObjectType: OBJECT_TYPES.UNIT,
-            recipientUnitObjectType: OBJECT_TYPES.UNIT,
-            reporterUnitObjectType: OBJECT_TYPES.UNIT,
+            unitObjectType: reportableObjectTypesWhere(),
+            recipientUnitObjectType: reportableObjectTypesWhere(),
+            reporterUnitObjectType: reportableObjectTypesWhere(),
         };
 
         if (reportingUnitIds.length > 0) {
@@ -967,7 +979,7 @@ export class ReportRepository {
                 where: {
                     startDate: { [Op.lte]: date },
                     endDate: { [Op.gt]: date },
-                    objectType: OBJECT_TYPES.UNIT,
+                    objectType: { [Op.eq]: Sequelize.col("Report.unit_object_type") },
                 }
             }, {
                 association: "unitStatus",
@@ -991,7 +1003,7 @@ export class ReportRepository {
                 where: {
                     startDate: { [Op.lte]: date },
                     endDate: { [Op.gt]: date },
-                    objectType: OBJECT_TYPES.UNIT,
+                    objectType: { [Op.eq]: Sequelize.col("Report.recipient_unit_object_type") },
                 }
             }, {
                 association: "unitStatus",
@@ -1055,7 +1067,7 @@ export class ReportRepository {
                                                AND shoval.report_items."status" IN (${itemStatuses.map((status) => `'${status}'`).join(", ")}))`)
                 },
                 status: { [Op.in]: itemStatuses },
-                reportingUnitObjectType: OBJECT_TYPES.UNIT,
+                reportingUnitObjectType: reportableObjectTypesWhere(),
             },
 
         }];

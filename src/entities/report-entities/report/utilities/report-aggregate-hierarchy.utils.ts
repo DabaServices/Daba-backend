@@ -1,4 +1,5 @@
 import { BadGatewayException } from "@nestjs/common";
+import Decimal from "decimal.js";
 import { isDefined, isEmptyish, isNullish } from "remeda";
 import { MESSAGE_TYPES, OBJECT_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_LEVELS, UNIT_RELATION_TYPES, UNIT_STATUSES } from "../../../../constants";
 import { UnitRelation } from "../../../unit-entities/unit-relations/unit-relation.model";
@@ -329,7 +330,7 @@ const upsertReports = (
 
     for (const material of aggregatedMaterials) {
         const existing = reports[reportKey]?.items[material.materialId];
-        const quantity = Number(material.quantity);
+        const quantity = getReportQuantity(reportType, material);
 
         if (existing) {
             existing.reportedQuantity = quantity;
@@ -378,6 +379,38 @@ const toSafeQuantity = (value: string | number | null | undefined) => {
     return Number.isNaN(parsedQuantity) ? 0 : parsedQuantity;
 };
 
+const toSafeMultiply = (value: string | number | null | undefined) => {
+    const parsedMultiply = Number(value ?? 0);
+
+    return Number.isFinite(parsedMultiply) && parsedMultiply > 1 ? parsedMultiply : 0;
+};
+
+const getReportItemMultiply = (
+    item: { material?: { multiply?: string | number | null; dataValues?: { multiply?: string | number | null } } }
+) => toSafeMultiply(item.material?.multiply ?? item.material?.dataValues?.multiply);
+
+const roundToNearestMultiply = (quantity: number, multiply: number | undefined) => {
+    const safeMultiply = toSafeMultiply(multiply);
+
+    if (quantity <= 0 || safeMultiply <= 1) return quantity;
+
+    const roundedQuantity = new Decimal(quantity)
+        .div(safeMultiply)
+        .toNearest(1)
+        .times(safeMultiply)
+        .toNumber();
+
+    return Math.max(safeMultiply, roundedQuantity);
+};
+
+const getReportQuantity = (reportType: number, material: AggregatedMaterials) => {
+    const quantity = toSafeQuantity(material.quantity);
+
+    return reportType === REPORT_TYPES.REQUEST
+        ? roundToNearestMultiply(quantity, material.multiply)
+        : quantity;
+};
+
 const mergeAggregatedMaterial = (
     aggregatedMaterials: AggregatedMaterials[],
     candidate: AggregatedMaterials
@@ -390,8 +423,13 @@ const mergeAggregatedMaterial = (
             materialId: candidate.materialId,
             quantity,
             status: candidate.status,
+            multiply: candidate.multiply,
         });
         return;
+    }
+
+    if (isNullish(existing.multiply) && !isNullish(candidate.multiply)) {
+        existing.multiply = candidate.multiply;
     }
 
     if (candidate.status === RECORD_STATUS.ACTIVE) {
@@ -422,6 +460,12 @@ const applyUnitReportStatusOverride = (
 
         if (existing) {
             existing.status = status;
+            if (existing.quantity === 0 && status === RECORD_STATUS.ACTIVE) {
+                existing.quantity = quantity;
+            }
+            if (isNullish(existing.multiply)) {
+                existing.multiply = getReportItemMultiply(item);
+            }
 
             continue;
         }
@@ -430,6 +474,7 @@ const applyUnitReportStatusOverride = (
             materialId: item.materialId,
             quantity,
             status,
+            multiply: getReportItemMultiply(item),
         });
     }
 };
@@ -470,6 +515,7 @@ const calculateReports = async (
                 materialId: item.materialId,
                 quantity: 0,
                 status: RECORD_STATUS.ACTIVE,
+                multiply: getReportItemMultiply(item),
             })) ?? []);
 
             upsertReports(
@@ -492,6 +538,7 @@ const calculateReports = async (
                     materialId: item.materialId,
                     quantity: toSafeQuantity(item.confirmedQuantity ?? item.reportedQuantity),
                     status: item.status ?? RECORD_STATUS.ACTIVE,
+                    multiply: getReportItemMultiply(item),
                 });
             }
 

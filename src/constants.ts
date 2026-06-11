@@ -15,11 +15,23 @@ export const MATERIAL_TYPES = {
 
 export const UNIT_RELATION_TYPES = {
   ZRA: '1',
+  COMPANY: '2',
 };
 
 export const OBJECT_TYPES = {
-    UNIT: 'O'
-}
+  UNIT: 'O',
+  COMPANY: 'PL',
+};
+
+export const REPORTABLE_OBJECT_TYPES = [
+  OBJECT_TYPES.UNIT,
+  OBJECT_TYPES.COMPANY,
+];
+
+export const REPORTABLE_UNIT_RELATION_TYPES = [
+  UNIT_RELATION_TYPES.ZRA,
+  UNIT_RELATION_TYPES.COMPANY,
+];
 
 export const MESSAGE_TYPES = {
   FATAL: 'Fatal',

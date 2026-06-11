@@ -1,11 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op, Transaction } from "sequelize";
-import { OBJECT_TYPES } from "../../../constants";
+import { REPORTABLE_OBJECT_TYPES } from "../../../constants";
 import { Report } from "../report/report.model";
 import { IReportItem, ReportItem } from "./report-item.model";
 import { ReportItemKey } from "./report.types";
 import { isNullish } from "remeda";
+
+const reportableObjectTypesWhere = () => ({ [Op.in]: REPORTABLE_OBJECT_TYPES });
 
 @Injectable()
 export class ReportItemRepository {
@@ -27,14 +29,14 @@ export class ReportItemRepository {
                 model: ReportItem,
                 where: {
                     ...reportWhereClause,
-                    reportingUnitObjectType: OBJECT_TYPES.UNIT,
+                    reportingUnitObjectType: reportableObjectTypesWhere(),
                 }
             }],
             where: {
                 ...reportItemWhereClause,
-                unitObjectType: OBJECT_TYPES.UNIT,
-                recipientUnitObjectType: OBJECT_TYPES.UNIT,
-                reporterUnitObjectType: OBJECT_TYPES.UNIT,
+                unitObjectType: reportableObjectTypesWhere(),
+                recipientUnitObjectType: reportableObjectTypesWhere(),
+                reporterUnitObjectType: reportableObjectTypesWhere(),
                 reportTypeId: { [Op.in]: reportItemKey.reportsTypesIds },
                 createdOn: reportItemKey.date
             }
