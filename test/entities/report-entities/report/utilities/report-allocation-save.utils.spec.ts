@@ -114,6 +114,41 @@ describe("report-allocation-save utils", () => {
         }]);
     });
 
+    it("prefers saved Matkal allocations over requisitions while still requesting", () => {
+        const changes = buildDownloadAllocationChanges({
+            isMatkal: true,
+            matkalStatusId: UNIT_STATUSES.REQUESTING,
+            outgoingAllocationReports: [{
+                unitId: 1,
+                recipientUnitId: 10,
+                items: [{
+                    materialId: "allocated-material",
+                    reportedQuantity: 5,
+                }],
+            }] as any,
+            requisitionReports: [{
+                unitId: 10,
+                recipientUnitId: 1,
+                items: [{
+                    materialId: "allocated-material",
+                    confirmedQuantity: 5,
+                }, {
+                    materialId: "unallocated-material",
+                    confirmedQuantity: 9,
+                }],
+            }] as any,
+            isDvhExcel: false,
+        });
+
+        expect(changes).toEqual([{
+            unitId: 10,
+            materialId: "allocated-material",
+            quantity: 5,
+            existingConfirmedQuantity: 0,
+            existingBalanceQuantity: 0,
+        }]);
+    });
+
     it("adds reset draft quantity to existing confirmed and balance allocation values", () => {
         const changes = buildAllocationChangesFromReports([{
             unitId: 1,

@@ -165,7 +165,7 @@ export const buildDownloadAllocationChanges = ({
     }
 
     const statusId = matkalStatusId ?? UNIT_STATUSES.REQUESTING;
-    if (statusId === UNIT_STATUSES.REQUESTING) {
+    if (statusId === UNIT_STATUSES.REQUESTING && outgoingAllocationReports.length === 0) {
         return buildAllocationChangesFromRequisitionReports(requisitionReports);
     }
 

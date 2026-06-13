@@ -216,7 +216,7 @@ export const buildReportsResponse = ({
             quantityLeftToAllocateByMaterial.set(
                 item.materialId,
                 round((quantityLeftToAllocateByMaterial.get(item.materialId) ?? 0)
-                + toNumber(item.balanceQuantity), 3)
+                    + toNumber(item.balanceQuantity), 3)
             );
         }
     }
@@ -308,7 +308,9 @@ export const buildReportsResponse = ({
                     type: {
                         id: report.reportTypeId,
                         quantity: isAllocationReport
-                            ? toNumber(item.reportedQuantity)
+                            ? report.unitId === screenUnitId
+                                ? toNumber(item.reportedQuantity)
+                                : toNumber(item.confirmedQuantity)
                             : fetchQuantity ? toNumber(item.confirmedQuantity) : 0,
                         availableQuantityToEat: isAllocationReport
                             ? toNumber(item.balanceQuantity)

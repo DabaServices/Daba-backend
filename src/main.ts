@@ -4,6 +4,7 @@ import * as bodyParser from 'body-parser';
 import { AppModule } from './appModule.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
+import { ApplicationAccessMiddleware } from './common/authorization/application-access.middleware';
 import { HeadersMiddeware } from './common/middlewares/headers';
 
 async function bootstrap() {
@@ -16,6 +17,9 @@ async function bootstrap() {
   app.use((req, res, next) => {
     if (req.path.startsWith('/api-docs') || req.path.startsWith('/server-time')) return next();
     new HeadersMiddeware().use(req, res, next);
+  });
+  app.use((req, res, next) => {
+    void new ApplicationAccessMiddleware().use(req, res, next);
   });
   app.useGlobalInterceptors(app.get(ResponseInterceptor));
   app.useGlobalFilters(app.get(HttpExceptionFilter));
