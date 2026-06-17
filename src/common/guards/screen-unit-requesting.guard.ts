@@ -23,13 +23,6 @@ export class ScreenUnitRequestingGuard implements CanActivate {
     const screenDate =
       request.date ?? getHeaderValue(request.headers.screendate);
 
-    if (!Number.isInteger(screenUnitId) || screenUnitId <= 0 || !screenDate) {
-      throw new BadRequestException({
-        message: 'Missing screen unit or screen date',
-        type: MESSAGE_TYPES.FAILURE,
-      });
-    }
-
     const screenUnitStatus = await UnitStatus.findOne({
       attributes: ['unitStatusId'],
       where: {

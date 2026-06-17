@@ -208,22 +208,13 @@ export class UnitHierarchyService {
     const uniqueUnitIds = Array.from(
       new Set(unitDetails.map((detail) => detail.unitId)),
     );
-    const [unitStatuses, directParentRelations] = await Promise.all([
-      this.repository.fetchUnitStatusesForDate(date, uniqueUnitIds),
-      this.repository.fetchDirectParentRelations(date, uniqueUnitIds),
-    ]);
+    const directParentRelations =
+      await this.repository.fetchDirectParentRelations(date, uniqueUnitIds);
 
     const detailByUnit = new Map<number, Unit>();
     for (const detail of unitDetails) {
       if (!detailByUnit.has(detail.unitId)) {
         detailByUnit.set(detail.unitId, detail);
-      }
-    }
-
-    const statusByUnit = new Map<number, UnitStatus>();
-    for (const status of unitStatuses) {
-      if (!statusByUnit.has(status.unitId)) {
-        statusByUnit.set(status.unitId, status);
       }
     }
 
@@ -245,8 +236,25 @@ export class UnitHierarchyService {
         ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
       ])
       : null;
+    const responseUnitIds = connectedUnitIds
+      ? uniqueUnitIds.filter((unitId) => connectedUnitIds.has(unitId))
+      : uniqueUnitIds;
+    const responseParentUnitIds = responseUnitIds
+      .map((unitId) => parentByChild.get(unitId))
+      .filter((unitId): unitId is number => unitId !== undefined);
+    const unitStatuses = await this.repository.fetchUnitStatusesForDate(
+      date,
+      Array.from(new Set([...responseUnitIds, ...responseParentUnitIds])),
+    );
 
-    const units = uniqueUnitIds.map((unitId): UnitHierarchyNode => {
+    const statusByUnit = new Map<number, UnitStatus>();
+    for (const status of unitStatuses) {
+      if (!statusByUnit.has(status.unitId)) {
+        statusByUnit.set(status.unitId, status);
+      }
+    }
+
+    const units = responseUnitIds.map((unitId): UnitHierarchyNode => {
       const detail = detailByUnit.get(unitId);
       const status =
         statusByUnit.get(unitId)?.unitStatus?.dataValues ?? DEFAULT_STATUS;

@@ -15,7 +15,8 @@ async function bootstrap() {
   });
 
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api-docs') || req.path.startsWith('/server-time')) return next();
+    const publicPrefixes = ['/api-docs', '/server-time', '/health'];
+    if (publicPrefixes.some(prefix => req.path.startsWith(prefix))) return next();
     new HeadersMiddeware().use(req, res, next);
   });
   app.use((req, res, next) => {

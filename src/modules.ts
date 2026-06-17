@@ -13,6 +13,7 @@ import { UnitStandardTagModule } from './entities/standard-entities/unit-standar
 import { UnitHierarchyModule } from './entities/unit-entities/features/unit-hierarchy/unit-hierarchy.module';
 import { UnitStatusModule } from './entities/unit-entities/units-statuses/units-statuses.module';
 import { UnitUserModule } from './entities/unit-entities/users/user.module';
+import { HealthModule } from './health/health.module';
 import { ServerTimeModule } from './server-time/server-time.module';
 import { StandardModule } from './entities/standard-entities/standard/standard.module';
 
@@ -30,6 +31,7 @@ export default [
   UnitStandardTagModule,
   UnitUserModule,
   StandardValuesModule,
+  HealthModule,
   ServerTimeModule,
   StocksModule,
   MaterialStandardGroupModule,

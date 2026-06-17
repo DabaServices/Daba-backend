@@ -10,6 +10,12 @@ const buildUnitDetail = (
   description,
   unitLevelId,
   tsavIrgunCodeId: String(unitId),
+  dataValues: {
+    unitId,
+    description,
+    unitLevelId,
+    tsavIrgunCodeId: String(unitId),
+  },
 });
 
 const buildRelation = (unitId: number, relatedUnitId: number) => ({
@@ -33,6 +39,7 @@ const buildService = ({
   };
   const unitUserRepository = {
     fetchUnitUser: jest.fn().mockResolvedValue({
+      unitId: rootUnitId,
       dataValues: { unitId: rootUnitId },
     }),
   };
@@ -51,17 +58,17 @@ const buildService = ({
 
 describe('UnitHierarchyService', () => {
   describe('getHierarchyForUser', () => {
-    it('returns all active units and marks only the user-root branch as connected', async () => {
-      const { service } = buildService({
-        rootUnitId: 1,
+    it('returns only the user-root branch', async () => {
+      const { repository, service } = buildService({
+        rootUnitId: 100,
         unitDetails: [
-          buildUnitDetail(1, 'Root', 0),
-          buildUnitDetail(2, 'Connected child', 1),
+          buildUnitDetail(100, 'Root', 0),
+          buildUnitDetail(101, 'Connected child', 1),
           buildUnitDetail(10, 'Unconnected parent', 2),
           buildUnitDetail(11, 'Unconnected child', 4),
         ],
         relations: [
-          buildRelation(1, 2),
+          buildRelation(100, 101),
           buildRelation(10, 11),
         ],
       });
@@ -70,10 +77,10 @@ describe('UnitHierarchyService', () => {
         service.getHierarchyForUser('test-user', '2026-06-02'),
       ).resolves.toEqual([
         {
-          id: 1,
+          id: 100,
           description: 'Root',
           level: 0,
-          simul: '1',
+          simul: '100',
           isConnectedToRoot: true,
           isConnectedToMatkal: false,
           isRootUnit: true,
@@ -82,60 +89,35 @@ describe('UnitHierarchyService', () => {
           parent: null,
         },
         {
-          id: 2,
+          id: 101,
           description: 'Connected child',
           level: 1,
-          simul: '2',
+          simul: '101',
           isConnectedToRoot: true,
           isConnectedToMatkal: false,
           isRootUnit: false,
           isEmergencyUnit: false,
           status: { id: 0, description: 'בדיווח' },
           parent: {
-            id: 1,
+            id: 100,
             description: 'Root',
             level: 0,
-            simul: '1',
-            status: { id: 0, description: 'בדיווח' },
-          },
-        },
-        {
-          id: 10,
-          description: 'Unconnected parent',
-          level: 2,
-          simul: '10',
-          isConnectedToRoot: false,
-          isConnectedToMatkal: false,
-          isRootUnit: false,
-          isEmergencyUnit: true,
-          status: { id: 0, description: 'בדיווח' },
-          parent: null,
-        },
-        {
-          id: 11,
-          description: 'Unconnected child',
-          level: 4,
-          simul: '11',
-          isConnectedToRoot: false,
-          isConnectedToMatkal: false,
-          isRootUnit: false,
-          isEmergencyUnit: true,
-          status: { id: 0, description: 'בדיווח' },
-          parent: {
-            id: 10,
-            description: 'Unconnected parent',
-            level: 2,
-            simul: '10',
+            simul: '100',
             status: { id: 0, description: 'בדיווח' },
           },
         },
       ]);
+      expect(repository.fetchUnitStatusesForDate).toHaveBeenCalledWith(
+        '2026-06-02',
+        [100, 101],
+      );
     });
   });
 
   describe('getLowerLevelUnitsConnection', () => {
     it('returns lower-level units with recursive connection to the screen unit', async () => {
       const { service } = buildService({
+        rootUnitId: 2,
         unitDetails: [
           buildUnitDetail(6133, 'Matkal', 0),
           buildUnitDetail(1, 'Root', 0),
@@ -213,6 +195,7 @@ describe('UnitHierarchyService', () => {
 
     it('limits lower-level units to ten results', async () => {
       const { service } = buildService({
+        rootUnitId: 2,
         unitDetails: [
           buildUnitDetail(2, 'Screen', 1),
           ...Array.from({ length: 12 }, (_, index) =>
@@ -229,6 +212,7 @@ describe('UnitHierarchyService', () => {
 
     it('rejects a missing screen unit', async () => {
       const { service } = buildService({
+        rootUnitId: 2,
         unitDetails: [buildUnitDetail(1, 'Root', 0)],
         relations: [],
       });

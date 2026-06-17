@@ -15,6 +15,7 @@ const DEFAULT_APPLICATION_ID = 'DABA';
 
 const SKIPPED_PREFIXES = [
   '/health',
+  '/server-time',
 ];
 
 const normalizeHost = (host: string) => host.trim().replace(/\/$/, '');
@@ -72,29 +73,22 @@ export class ApplicationAccessMiddleware {
     const authorityHost = process.env.AUTHORITY_SERVICE_HOST?.trim();
     const applicationId = (process.env.APPLICATION_ID ?? DEFAULT_APPLICATION_ID).trim().toUpperCase();
 
-    if (!authorityHost || !applicationId || shouldSkip(request)) {
+    if (!applicationId || shouldSkip(request)) {
       return next();
     }
 
     const username = getUsername(request);
     if (!username) {
-      return respond(response, 401, 'Missing user identity');
+      return respond(response, 401, 'בדיקת ההרשאות נכשלה, יש לנסות שוב');
     }
 
     const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(),
-      Number(process.env.AUTHORITY_SERVICE_TIMEOUT_MS ?? 1500),
-    );
 
     try {
       const accessResponse = await fetch(`${normalizeHost(authorityHost)}/api/access/check`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(process.env.AUTHORITY_SERVICE_API_KEY
-            ? { 'x-authority-api-key': process.env.AUTHORITY_SERVICE_API_KEY }
-            : {}),
         },
         body: JSON.stringify({
           username,
@@ -105,7 +99,11 @@ export class ApplicationAccessMiddleware {
       });
 
       if (!accessResponse.ok) {
-        throw new Error(`Authority service returned ${accessResponse.status}`);
+        return respond(
+          response,
+          503,
+          'שגיאה בבדיקת ההרשאות, יש לנסות שוב'
+        );
       }
 
       const payload = await accessResponse.json() as AccessCheckResponse;
@@ -113,7 +111,7 @@ export class ApplicationAccessMiddleware {
 
       if (result.allowed) return next();
 
-      return respond(response, 403, `User is not authorized for ${applicationId}`);
+      return respond(response, 403, `נראה שאינך מורשה להכנס לכאן, יש לפנות לתמיכה`);
     } catch (error) {
       if (process.env.AUTHORITY_FAIL_OPEN === 'true') {
         return next();
@@ -122,10 +120,8 @@ export class ApplicationAccessMiddleware {
       return respond(
         response,
         503,
-        `Authority service check failed: ${error instanceof Error ? error.message : String(error)}`,
+        'שגיאה בבדיקת ההרשאות, יש לנסות שוב'
       );
-    } finally {
-      clearTimeout(timeout);
     }
   }
 }
