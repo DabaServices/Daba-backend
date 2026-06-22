@@ -73,7 +73,7 @@ export class ApplicationAccessMiddleware {
     const authorityHost = process.env.AUTHORITY_SERVICE_HOST?.trim();
     const applicationId = (process.env.APPLICATION_ID ?? DEFAULT_APPLICATION_ID).trim().toUpperCase();
 
-    if (!applicationId || shouldSkip(request)) {
+    if (!applicationId || shouldSkip(request) || !authorityHost) {
       return next();
     }
 
