@@ -50,7 +50,8 @@ INSERT INTO shoval.report_types (id, description) VALUES
     (2, 'שצ״ל'),
     (3, 'פקודות'),
     (4, 'הקצאות'),
-    (5, 'דרישות - אפליקציה');
+    (5, 'דרישות - אפליקציה'),
+    (6, 'ויסות');
 
 INSERT INTO shoval.stock_types (id, description) VALUES
     (0, 'אשרות'),

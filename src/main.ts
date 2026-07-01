@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
+import compression from 'compression';
 import { AppModule } from './appModule.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -9,6 +10,7 @@ import { HeadersMiddeware } from './common/middlewares/headers';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.use(compression());
   app.enableCors({
     origin: '*',
     methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS'

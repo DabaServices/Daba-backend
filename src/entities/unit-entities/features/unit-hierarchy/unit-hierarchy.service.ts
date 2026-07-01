@@ -159,20 +159,26 @@ export class UnitHierarchyService {
     private readonly unitUserRepository: UserRepository,
   ) { }
 
+  async getRootUnitIdForUser(username: string): Promise<number> {
+    const userUnit = await this.unitUserRepository.fetchUnitUser(username);
+    const rootUnitId = userUnit?.dataValues.unitId;
+
+    if (!isDefined(rootUnitId)) {
+      throw new BadGatewayException({
+        message: 'אינך מקושר ליחידה ארגונית',
+        type: 'Fatal',
+      });
+    }
+
+    return rootUnitId;
+  }
+
   async getHierarchyForUser(
     username: string,
     date: string,
   ): Promise<UnitHierarchyNode[]> {
     try {
-      const userUnit = await this.unitUserRepository.fetchUnitUser(username);
-      const rootUnit = userUnit?.dataValues.unitId;
-
-      if (!isDefined(rootUnit)) {
-        throw new BadGatewayException({
-          message: 'אינך מקושר ליחידה ארגונית',
-          type: 'Fatal',
-        });
-      }
+      const rootUnit = await this.getRootUnitIdForUser(username);
 
       const units = await this.getAllUnitsWithParents(date, rootUnit);
       const rootNode = units.find((unit) => unit.id === rootUnit);

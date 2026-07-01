@@ -141,10 +141,16 @@ export class ReportService {
         }
     }
 
-    async fetchReports(date: string, screenUnitId: number): Promise<ReportDto[]> {
-        const baseReports = await this.repository.fetchReportsData(date, screenUnitId);
-
-        const [allocationReports, screenAllocationReports, standaloneComments] = await Promise.all([
+    async fetchReports(
+        date: string,
+        requestedScreenUnitId: number,
+        username = '',
+    ): Promise<ReportDto[]> {
+        const screenUnitId = requestedScreenUnitId > 0
+            ? requestedScreenUnitId
+            : await this.unitHierarchyService.getRootUnitIdForUser(username);
+        const [baseReports, allocationReports, screenAllocationReports, standaloneComments] = await Promise.all([
+            this.repository.fetchReportsData(date, screenUnitId),
             this.repository.fetchAllocationReportsData(date, screenUnitId),
             this.repository.fetchIncomingAllocationReports(date, screenUnitId),
             this.repository.fetchStandaloneCommentsData(date, screenUnitId),
@@ -307,7 +313,7 @@ export class ReportService {
                 date,
                 connectedUnitIds,
             );
-
+            
             const reportsToSave = await getAggregatedReports({
                 date,
                 unitsToLaunch: aggregatedReportsDTO.unitsIds,

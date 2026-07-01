@@ -19,6 +19,7 @@ export class ReportController {
     return this.service.fetchReports(
       request['date'],
       Number(request.headers['unit']),
+      request['username'],
     );
   }
 

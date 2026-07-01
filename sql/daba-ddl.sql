@@ -376,8 +376,7 @@ CREATE TABLE shoval.draft_report_items (
     status character varying(20),
     CONSTRAINT draftreportitems_pkey PRIMARY KEY (draft_id, draft_item),
     CONSTRAINT draftreportitems_draft_id_fkey FOREIGN KEY (id) REFERENCES shoval.draft_reports(id) ON DELETE CASCADE,
-    CONSTRAINT draftreportitems_center_id_fkey FOREIGN KEY (id) REFERENCES shoval.supply_centers(id) ON DELETE CASCADE,
-    CONSTRAINT draftreportitems_material_id_fkey FOREIGN KEY (id) REFERENCES shoval.materials(id) ON DELETE CASCADE
+    CONSTRAINT draftreportitems_center_id_fkey FOREIGN KEY (id) REFERENCES shoval.supply_centers(id) ON DELETE CASCADE
 );
 
 alter sequence shoval.draft_report_items_draft_items_seq owned by shoval.draft_report_items.draft_item;
