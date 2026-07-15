@@ -71,5 +71,5 @@ export const enum UnitObjectTypes {
   Frame = 'O',
 }
 
-export const MATKAL_UNIT_ID = 1
-export const MARTACH_UNIT_ID = 111
+export const MATKAL_UNIT_ID = process.env.MATKAL_UNIT_ID;
+export const MARTACH_UNIT_ID = process.env.MARTACH_UNIT_ID;

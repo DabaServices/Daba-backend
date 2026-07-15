@@ -284,7 +284,9 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isEmergencyUnit: emergencyUnitIds.has(unitId),
-        isConnectedToMatkal: matkalConnectedUnitIds.has(unitId),
+        isConnectedToMatkal: unitId === MATKAL_UNIT_ID
+          ? true
+          : matkalConnectedUnitIds.has(unitId),
         ...(connectedUnitIds
           ? {
             isConnectedToRoot: connectedUnitIds.has(unitId),
@@ -455,7 +457,7 @@ export class UnitHierarchyService {
 
     const screenUnitLevel = rootUnit.unitLevelId ?? 0;
     const normalizedFilter = filter.trim().toLowerCase();
-    
+
     const lowerUnitIds = Array.from(detailByUnit.keys())
       .filter((unitId) => {
         const detail = detailByUnit.get(unitId);
