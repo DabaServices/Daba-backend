@@ -4,7 +4,7 @@ import { MESSAGE_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_LEVELS, UNIT_STATUSES 
 import { IReportItem } from "./report-item.model";
 import { Sequelize } from "sequelize-typescript";
 import { DeleteItemsDTO, EatAllocationDTO } from "./report.types";
-import { isNullish } from "remeda";
+import { isNullish, round } from "remeda";
 import { UnitRepository } from "src/entities/unit-entities/unit/unit.repository";
 import { UnitStatusRepository } from "src/entities/unit-entities/units-statuses/units-statuses.repository";
 
@@ -31,6 +31,16 @@ export class ReportItemService {
             });
 
             const recipientUnitItem = recipientUnitAllocation?.[0]?.items?.[0]?.dataValues;
+            const availableQuantityToEat = round(Number(recipientUnitItem?.balanceQuantity ?? 0), 3);
+            const quantityToEat = round(Number(eatAllocation.quantity), 3);
+
+            if (quantityToEat > availableQuantityToEat) {
+                throw new BadRequestException({
+                    message: `נכשלה אכילת ההקצאה, לא ניתן למשוך יותר מ-${availableQuantityToEat} עבור מק״ט ${eatAllocation.materialId}`,
+                    type: MESSAGE_TYPES.FAILURE
+                });
+            }
+
             let screenUnitItem: IReportItem | undefined;
 
             if (unitDetails?.unitLevelId !== UNIT_LEVELS.MATKAL) {
@@ -76,6 +86,9 @@ export class ReportItemService {
             console.log(error);
 
             await transaction.rollback();
+
+            if (error instanceof BadRequestException) throw error;
+
             throw new BadRequestException({
                 message: 'נכשלה אכילת ההקצאה, יש לנסות שוב',
                 type: MESSAGE_TYPES.FAILURE

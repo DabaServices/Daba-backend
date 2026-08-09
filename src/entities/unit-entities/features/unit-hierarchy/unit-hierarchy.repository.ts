@@ -6,6 +6,7 @@ import { OBJECT_TYPES, UNIT_LEVELS, UNIT_RELATION_TYPES } from "../../../../cons
 import { UnitId } from "../../unit-id/unit-id.model";
 import { UnitRelation } from "../../unit-relations/unit-relation.model";
 import { UnitStatusType } from "../../unit-status-type/unit-status-type.model";
+import { getReportableUnitTypeWhere } from "../../unit/unit-query.utils";
 import { Unit } from "../../unit/unit.model";
 import { UnitStatus } from "../../units-statuses/units-statuses.model";
 
@@ -79,6 +80,7 @@ export class UnitHierarchyRepository {
           model: Unit,
           where: {
             objectType: OBJECT_TYPES.UNIT,
+            ...getReportableUnitTypeWhere(),
           }
         }]
       },
@@ -105,6 +107,7 @@ export class UnitHierarchyRepository {
           model: Unit,
           where: {
             objectType: OBJECT_TYPES.UNIT,
+            ...getReportableUnitTypeWhere(),
           }
         }]
       }],
@@ -125,7 +128,8 @@ export class UnitHierarchyRepository {
       where: {
         startDate: { [Op.lte]: date },
         endDate: { [Op.gt]: date },
-        objectType: OBJECT_TYPES.UNIT,
+        objectType: [OBJECT_TYPES.UNIT, OBJECT_TYPES.COMPANY],
+        ...getReportableUnitTypeWhere(),
       },
       order: [["startDate", "DESC"]],
     });
@@ -141,6 +145,7 @@ export class UnitHierarchyRepository {
         startDate: { [Op.lte]: date },
         endDate: { [Op.gt]: date },
         objectType: OBJECT_TYPES.UNIT,
+        ...getReportableUnitTypeWhere(),
       },
       order: [["startDate", "DESC"]],
     });
@@ -164,6 +169,7 @@ export class UnitHierarchyRepository {
       endDate: { [Op.gt]: date },
       objectType: OBJECT_TYPES.UNIT,
       unitLevelId: { [Op.gt]: currentLevel },
+      ...getReportableUnitTypeWhere(),
       ...(normalizedFilter
         ? {
           [Op.or]: [
@@ -208,6 +214,7 @@ export class UnitHierarchyRepository {
         startDate: { [Op.lte]: date },
         endDate: { [Op.gt]: date },
         objectType: OBJECT_TYPES.UNIT,
+        ...getReportableUnitTypeWhere(),
         [Op.or]: [
           ...(unitIds.length > 0 ? [{ unitId: { [Op.in]: unitIds } }] : []),
           ...(unitSimuls.length > 0 ? [{ tsavIrgunCodeId: { [Op.in]: unitSimuls } }] : []),
@@ -275,7 +282,7 @@ export class UnitHierarchyRepository {
       where: {
         unitRelationId: UNIT_RELATION_TYPES.ZRA,
         unitObjectType: OBJECT_TYPES.UNIT,
-        relatedUnitObjectType: OBJECT_TYPES.UNIT,
+        relatedUnitObjectType: { [Op.in]: [OBJECT_TYPES.UNIT, OBJECT_TYPES.COMPANY] },
         relatedUnitId: { [Op.in]: childUnitIds },
         startDate: { [Op.lte]: date },
         endDate: { [Op.gt]: date },
@@ -335,6 +342,7 @@ export class UnitHierarchyRepository {
         objectType: OBJECT_TYPES.UNIT,
         startDate: { [Op.lte]: date },
         endDate: { [Op.gt]: date },
+        ...getReportableUnitTypeWhere(),
       },
       order: [["startDate", "DESC"]],
       transaction,

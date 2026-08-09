@@ -1,3 +1,4 @@
+import { round } from "remeda";
 import { OBJECT_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_STATUSES } from "../../../../constants";
 import { Report } from "../report.model";
 import { IUnit } from "../../../unit-entities/unit/unit.model";
@@ -315,6 +316,47 @@ export const buildNextLevelAllocationDraftChanges = ({
     }
 
     return Array.from(reportsByKey.values());
+};
+
+export const findOverAllocatedMaterialId = ({
+    allocationChanges,
+    incomingAllocationReports,
+}: {
+    allocationChanges: AllocationChange[];
+    incomingAllocationReports: Report[];
+}): string | null => {
+    const availableByMaterial = new Map<string, number>();
+
+    for (const report of incomingAllocationReports) {
+        for (const item of report.items ?? []) {
+            if (!item.materialId) continue;
+
+            availableByMaterial.set(
+                item.materialId,
+                round(
+                    (availableByMaterial.get(item.materialId) ?? 0)
+                    + toNumber(item.balanceQuantity ?? item.confirmedQuantity ?? item.reportedQuantity),
+                    3
+                )
+            );
+        }
+    }
+
+    const requestedByMaterial = new Map<string, number>();
+
+    for (const change of allocationChanges) {
+        requestedByMaterial.set(
+            change.materialId,
+            round((requestedByMaterial.get(change.materialId) ?? 0) + toNumber(change.quantity), 3)
+        );
+    }
+
+    for (const [materialId, requested] of requestedByMaterial) {
+        if (requested <= 0) continue;
+        if (requested > (availableByMaterial.get(materialId) ?? 0)) return materialId;
+    }
+
+    return null;
 };
 
 export const buildAllocationBalanceUpdates = ({

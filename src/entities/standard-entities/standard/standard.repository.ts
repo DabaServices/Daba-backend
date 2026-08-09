@@ -3,6 +3,7 @@ import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import { Material } from "src/entities/material-entities/material/material.model";
 import { getMaterialSupplyCenterTypeWhere } from "src/entities/material-entities/material/material-query.utils";
+import { getReportableUnitTypeWhere } from "src/entities/unit-entities/unit/unit-query.utils";
 import { Unit } from "src/entities/unit-entities/unit/unit.model";
 import { UnitStatus } from "src/entities/unit-entities/units-statuses/units-statuses.model";
 import { RelevantStandard, RelevantStandardValue } from "./standard.types";
@@ -208,6 +209,7 @@ export class StandardRepository {
                 unitId: { [Op.in]: unitIds },
                 startDate: { [Op.lte]: date },
                 endDate: { [Op.gt]: date },
+                ...getReportableUnitTypeWhere(),
             },
             order: [["startDate", "DESC"]],
         });

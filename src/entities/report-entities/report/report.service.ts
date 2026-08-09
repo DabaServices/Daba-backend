@@ -35,7 +35,8 @@ import {
     buildAllocationsChanges,
     buildConfirmedAllocationChanges,
     buildDownloadAllocationChanges,
-    buildNextLevelAllocationDraftChanges
+    buildNextLevelAllocationDraftChanges,
+    findOverAllocatedMaterialId
 } from "./utilities/report-allocation-save.utils";
 import { aggregateAllocationDuhRows } from "./utilities/allocation-duh-export.utils";
 import {
@@ -755,6 +756,20 @@ export class ReportService {
                     )
             ]);
 
+            if (unitDetails?.unitLevelId !== UNIT_LEVELS.MATKAL) {
+                const overAllocatedMaterialId = findOverAllocatedMaterialId({
+                    allocationChanges,
+                    incomingAllocationReports,
+                });
+
+                if (overAllocatedMaterialId) {
+                    throw new BadRequestException({
+                        message: `נכשלה פעולת ההקצאה, הקצאת יותר מדי עבור מק״ט ${overAllocatedMaterialId}`,
+                        type: MESSAGE_TYPES.FAILURE
+                    });
+                }
+            }
+
             const confirmedAllocationReports: IReportsChanges[] = buildConfirmedAllocationChanges({
                 changes: allocationChanges,
                 username,
@@ -836,6 +851,8 @@ export class ReportService {
             };
         } catch (error: any) {
             await transaction.rollback();
+
+            if (error instanceof BadRequestException) throw error;
 
             throw new BadGatewayException({
                 message: error?.response?.message ?? 'נכשלה הורדת ההקצאות, יש לנסות שוב',

@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Op } from "sequelize";
 import { OBJECT_TYPES } from "../../../constants";
+import { getReportableUnitTypeWhere } from "./unit-query.utils";
 import { IUnit, Unit } from "./unit.model";
 
 export type ActiveUnitDetails = Pick<IUnit, "unitId" | "unitLevelId" | "startDate">;
@@ -17,7 +18,8 @@ export class UnitRepository {
                 unitId,
                 objectType: OBJECT_TYPES.UNIT,
                 startDate: { [Op.lte]: date },
-                endDate: { [Op.gt]: date }
+                endDate: { [Op.gt]: date },
+                ...getReportableUnitTypeWhere(),
             },
             order: [["startDate", "DESC"]],
             raw: true,

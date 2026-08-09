@@ -6,6 +6,7 @@ import { OBJECT_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_LEVELS, UNIT_RELATION_T
 import { ReportItem } from "../../report-entities/report-item/report-item.model";
 import { Report } from "../../report-entities/report/report.model";
 import { UnitRelation } from "../unit-relations/unit-relation.model";
+import { getReportableUnitTypeWhere } from "../unit/unit-query.utils";
 import { Unit } from "../unit/unit.model";
 import { IUnitStatus, UnitStatus } from "./units-statuses.model";
 
@@ -34,7 +35,7 @@ export class UnitStatusRepository {
                 where: {
                     unitRelationId: UNIT_RELATION_TYPES.ZRA,
                     unitObjectType: OBJECT_TYPES.UNIT,
-                    relatedUnitObjectType: OBJECT_TYPES.UNIT,
+                    relatedUnitObjectType: { [Op.in]: [OBJECT_TYPES.UNIT, OBJECT_TYPES.COMPANY] },
                     unitId: { [Op.in]: frontier },
                     startDate: { [Op.lte]: now },
                     endDate: { [Op.gte]: now }
@@ -76,6 +77,7 @@ export class UnitStatusRepository {
                 objectType: OBJECT_TYPES.UNIT,
                 startDate: { [Op.lte]: date },
                 endDate: { [Op.gt]: date },
+                ...getReportableUnitTypeWhere(),
             },
             transaction,
         });

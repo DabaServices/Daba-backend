@@ -6,6 +6,7 @@ import {
     buildConfirmedAllocationChanges,
     buildAllocationChangesFromRequisitionReports,
     buildNextLevelAllocationDraftChanges,
+    findOverAllocatedMaterialId,
     mergeMatkalRequisitionAllocations,
 } from "../../../../../src/entities/report-entities/report/utilities/report-allocation-save.utils";
 
@@ -281,5 +282,39 @@ describe("report-allocation-save utils", () => {
                 balanceQuantity: 2,
             }),
         ]);
+    });
+
+    it("detects allocations exceeding the incoming balance of a material", () => {
+        const incomingAllocationReports = [{
+            items: [
+                { materialId: "A", confirmedQuantity: 10, balanceQuantity: 8 },
+                { materialId: "A", confirmedQuantity: 2, balanceQuantity: 1.5 },
+                { materialId: "B", confirmedQuantity: 4, balanceQuantity: 4 },
+            ],
+        }] as any;
+
+        expect(findOverAllocatedMaterialId({
+            allocationChanges: [
+                { unitId: 10, materialId: "A", quantity: 6 },
+                { unitId: 11, materialId: "A", quantity: 3.5 },
+                { unitId: 10, materialId: "B", quantity: 4 },
+            ],
+            incomingAllocationReports,
+        })).toBeNull();
+
+        expect(findOverAllocatedMaterialId({
+            allocationChanges: [
+                { unitId: 10, materialId: "A", quantity: 6 },
+                { unitId: 11, materialId: "A", quantity: 3.6 },
+            ],
+            incomingAllocationReports,
+        })).toBe("A");
+    });
+
+    it("blocks allocating a material the unit never received", () => {
+        expect(findOverAllocatedMaterialId({
+            allocationChanges: [{ unitId: 10, materialId: "C", quantity: 1 }],
+            incomingAllocationReports: [{ items: [{ materialId: "A", balanceQuantity: 5 }] }] as any,
+        })).toBe("C");
     });
 });

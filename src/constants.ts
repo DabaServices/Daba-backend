@@ -30,7 +30,6 @@ export const REPORTABLE_OBJECT_TYPES = [
 
 export const REPORTABLE_UNIT_RELATION_TYPES = [
   UNIT_RELATION_TYPES.ZRA,
-  UNIT_RELATION_TYPES.COMPANY,
 ];
 
 export const MESSAGE_TYPES = {
@@ -48,12 +47,29 @@ export const REPORT_TYPES = {
 };
 
 export const UNIT_LEVELS = {
+  COMPANY: 5,
   GDUD: 4,
   HATIVA: 3,
   UGDA: 2,
   PIKUD: 1,
   MATKAL: 0,
 };
+
+export const UNIT_TYPES = {
+  MATKAL: 1,
+  MARLOG: 2,
+  MALAN: 3,
+  PIKUD: 4,
+  EMERGENCY: 5,
+};
+
+export const REPORTABLE_UNIT_TYPES = [
+  UNIT_TYPES.MATKAL,
+  UNIT_TYPES.MARLOG,
+  UNIT_TYPES.MALAN,
+  UNIT_TYPES.PIKUD,
+  UNIT_TYPES.EMERGENCY,
+];
 
 export const UNIT_STATUSES = {
   REQUESTING: 0,
@@ -71,5 +87,5 @@ export const enum UnitObjectTypes {
   Frame = 'O',
 }
 
-export const MATKAL_UNIT_ID = process.env.MATKAL_UNIT_ID;
-export const MARTACH_UNIT_ID = process.env.MARTACH_UNIT_ID;
+export const MATKAL_UNIT_ID = Number(process.env.MATKAL_UNIT_ID);
+export const MARTACH_UNIT_ID = Number(process.env.MARTACH_UNIT_ID);

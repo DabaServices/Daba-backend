@@ -118,7 +118,8 @@ const buildEmergencyUnitIds = (
   const gdudUnitIds: number[] = [];
 
   for (const [unitId, detail] of detailByUnit) {
-    if ((detail.unitLevelId ?? 0) === UNIT_LEVELS.GDUD) {
+    if ((detail.unitLevelId ?? 0) === UNIT_LEVELS.GDUD 
+  || (detail.unitLevelId ?? 0) === UNIT_LEVELS.COMPANY) {
       emergencyUnitIds.add(unitId);
       gdudUnitIds.push(unitId);
     }
@@ -279,18 +280,18 @@ export class UnitHierarchyService {
         : null;
 
       return {
-        id: unitId,
+        id: detail?.unitId ?? 0,
         description: detail?.description ?? '',
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
-        isEmergencyUnit: emergencyUnitIds.has(unitId),
-        isConnectedToMatkal: unitId === MATKAL_UNIT_ID
+        isEmergencyUnit: emergencyUnitIds.has(detail?.unitId ?? 0),
+        isConnectedToMatkal: detail?.unitId ?? 0 === MATKAL_UNIT_ID
           ? true
-          : matkalConnectedUnitIds.has(unitId),
+          : matkalConnectedUnitIds.has(detail?.unitId ?? 0),
         ...(connectedUnitIds
           ? {
-            isConnectedToRoot: connectedUnitIds.has(unitId),
-            isRootUnit: unitId === connectedRootUnitId,
+            isConnectedToRoot: connectedUnitIds.has(detail?.unitId ?? 0),
+            isRootUnit: detail?.unitId === connectedRootUnitId,
           }
           : {}),
         status,
@@ -834,7 +835,7 @@ export class UnitHierarchyService {
 
       const isLowerUnitUnderMatkal = await this.repository.isUnitUnderRootUnit(
         formattedDate,
-        MATKAL_UNIT_ID,
+        Number(process.env.MATKAL_UNIT_ID),
         lowerUnit,
         transaction,
       );
