@@ -169,19 +169,24 @@ export class UnitHierarchyRepository {
       endDate: { [Op.gt]: date },
       objectType: OBJECT_TYPES.UNIT,
       unitLevelId: { [Op.gt]: currentLevel },
-      ...getReportableUnitTypeWhere(),
-      ...(normalizedFilter
-        ? {
-          [Op.or]: [
-            { description: { [Op.iLike]: `%${normalizedFilter}%` } },
-            { tsavIrgunCodeId: { [Op.iLike]: `%${normalizedFilter}%` } },
-            Sequelize.where(
-              Sequelize.cast(Sequelize.col("unit_id"), "TEXT"),
-              { [Op.iLike]: `%${normalizedFilter}%` },
-            ),
-          ],
-        }
-        : {}),
+      [Op.and]: [
+        {
+          ...getReportableUnitTypeWhere(),
+        },
+        {
+          ...(normalizedFilter
+            ? {
+              [Op.or]: [
+                { description: { [Op.iLike]: `%${normalizedFilter}%` } },
+                { tsavIrgunCodeId: { [Op.iLike]: `%${normalizedFilter}%` } },
+                Sequelize.where(
+                  Sequelize.cast(Sequelize.col("unit_id"), "TEXT"),
+                  { [Op.iLike]: `%${normalizedFilter}%` },
+                ),
+              ],
+            }
+            : {}),
+        }]
     };
 
     return this.unitDetailModel.findAll({

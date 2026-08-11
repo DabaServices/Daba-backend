@@ -61,6 +61,7 @@ export const UNIT_TYPES = {
   MALAN: 3,
   PIKUD: 4,
   EMERGENCY: 5,
+  UNIT: 6
 };
 
 export const REPORTABLE_UNIT_TYPES = [
@@ -68,7 +69,7 @@ export const REPORTABLE_UNIT_TYPES = [
   UNIT_TYPES.MARLOG,
   UNIT_TYPES.MALAN,
   UNIT_TYPES.PIKUD,
-  UNIT_TYPES.EMERGENCY,
+  UNIT_TYPES.UNIT,
 ];
 
 export const UNIT_STATUSES = {

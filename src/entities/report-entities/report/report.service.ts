@@ -190,7 +190,6 @@ export class ReportService {
                 REPORT_TYPES.REQUEST,
                 REPORT_TYPES.INVENTORY,
                 REPORT_TYPES.USAGE,
-                REPORT_TYPES.ALLOCATION,
             ];
 
             const favoriteMaterials = await this.repository.fetchFavoriteMaterials(recipientUnitId);
@@ -314,7 +313,7 @@ export class ReportService {
                 date,
                 connectedUnitIds,
             );
-            
+
             const reportsToSave = await getAggregatedReports({
                 date,
                 unitsToLaunch: aggregatedReportsDTO.unitsIds,

@@ -108,6 +108,31 @@ describe("buildReportsResponse", () => {
         expect(data[0].items[0].allocatedQuantity).toBeNull();
     });
 
+    it("sets yesterday inventory to null when the unit did not report inventory in the previous committee", () => {
+        const data = buildReportsResponse({
+            screenUnitId: 35,
+            reports: [{
+                unitId: 100,
+                recipientUnitId: 35,
+                reportTypeId: REPORT_TYPES.INVENTORY,
+                unit: buildUnitAssociation(100, "Unit 100"),
+                recipientUnit: buildUnitAssociation(35, "Unit 35"),
+                items: [{
+                    materialId: "M0000001",
+                    confirmedQuantity: 2,
+                    status: "ACTIVE",
+                    material: {
+                        id: "M0000001",
+                        comments: [],
+                    },
+                }],
+            }] as any,
+            yesterdayInventoryReports: [],
+        });
+
+        expect(data[0].items[0].types[0].yesterdayInventoryQuantity).toBeNull();
+    });
+
     it("maps allocation reports to the recipient unit and keeps the allocation comment on the item type", () => {
         const data = buildReportsResponse({
             screenUnitId: 35,

@@ -316,7 +316,7 @@ export const buildReportsResponse = ({
                             ? toNumber(item.balanceQuantity)
                             : 0,
                         yesterdayInventoryQuantity: report.reportTypeId === REPORT_TYPES.INVENTORY
-                            ? (yesterdayInventoryQuantityByUnitMaterial.get(`${report.unitId}:${item.materialId}`) ?? 0)
+                            ? (yesterdayInventoryQuantityByUnitMaterial.get(`${report.unitId}:${item.materialId}`) ?? null)
                             : null,
                         comment: childUnitComment,
                         status: item.status ?? null,
@@ -442,7 +442,7 @@ export const buildReportsResponse = ({
                 quantity: 0,
                 availableQuantityToEat: 0,
                 yesterdayInventoryQuantity: reportTypeId === REPORT_TYPES.INVENTORY
-                    ? (yesterdayInventoryQuantityByUnitMaterial.get(`${itemUnitId}:${materialId}`) ?? 0)
+                    ? (yesterdayInventoryQuantityByUnitMaterial.get(`${itemUnitId}:${materialId}`) ?? null)
                     : null,
                 comment: commentText,
                 status: RECORD_STATUS.ACTIVE,
@@ -571,11 +571,7 @@ export const buildFavoriteReportsResponse = (
             items: buildFavoriteItems(
                 material.id,
                 childrenUnits,
-                reportTypeIds.filter(reportTypeId =>
-                    material.type === MATERIAL_TYPES.TOOL
-                        ? reportTypeId === REPORT_TYPES.INVENTORY
-                        : true
-                ),
+                reportTypeIds,
                 yesterdayInventoryQuantityByUnitMaterial,
             ),
         }))

@@ -14,7 +14,7 @@ export class ReportItemRepository {
     constructor(@InjectModel(Report) private readonly reportModel: typeof Report,
         @InjectModel(ReportItem) private readonly reportItemModel: typeof ReportItem) { }
 
-    fetchReports(reportItemKey: ReportItemKey) {
+    fetchReports(reportItemKey: ReportItemKey, transaction?: Transaction) {
         const reportWhereClause: any = {};
         const reportItemWhereClause: any = {};
 
@@ -39,7 +39,8 @@ export class ReportItemRepository {
                 reporterUnitObjectType: reportableObjectTypesWhere(),
                 reportTypeId: { [Op.in]: reportItemKey.reportsTypesIds },
                 createdOn: reportItemKey.date
-            }
+            },
+            transaction,
         })
     }
 

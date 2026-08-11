@@ -266,7 +266,7 @@ export class MaterialRepository {
                 include: [{
                     attributes: ['description'],
                     model: MainCategory
-                }]
+                }],
             },
             {
                 attributes: ["nickname"],

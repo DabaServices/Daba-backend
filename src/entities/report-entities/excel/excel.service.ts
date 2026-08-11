@@ -6,6 +6,7 @@ import { MATERIAL_TYPES, MESSAGE_TYPES, RECORD_STATUS, REPORT_TYPES, UNIT_LEVELS
 import { MaterialRepository } from "../../material-entities/material/material.repository";
 import { UnitHierarchyRepository, UnitLookupRow } from "../../unit-entities/features/unit-hierarchy/unit-hierarchy.repository";
 import { UnitRelation } from "../../unit-entities/unit-relations/unit-relation.model";
+import { getEmergencyUnitIds } from "../../unit-entities/features/unit-hierarchy/utilities/hierarchyRecursion";
 import { ReportRepository } from "../report/report.repository";
 import { ReportService } from "../report/report.service";
 import type { MaterialDto, ReportDto, ReportItemDto, ReportItemTypeDto, UnitDto } from "../report/report.types";
@@ -90,6 +91,13 @@ const INVENTORY_USAGE_LEVEL_MESSAGE = "עבור מלאי ושימוש ניתן �
 const REQUEST_LEVEL_MESSAGE = "עבור דרישה היחידה חייבת להיות נמוכה מיחידת המסך";
 const TEMPLATE_FILE_NAME = "template.xlsm";
 const TEMPLATE_MIME_TYPE = "application/vnd.ms-excel.sheet.macroEnabled.12";
+
+export const filterRegularUnitRequisitions = (
+    rows: ValidExcelRow[],
+    emergencyUnitIds: Set<number>
+) => rows.filter((row) =>
+    row.reportType !== REPORT_TYPES.REQUEST || emergencyUnitIds.has(row.unitId)
+);
 
 @Injectable()
 export class ExcelService {
@@ -181,12 +189,16 @@ export class ExcelService {
             importScope,
             screenUnit
         );
+        const emergencyRequisitionRows = filterRegularUnitRequisitions(
+            validRows,
+            getEmergencyUnitIds(activeRelations)
+        );
 
-        if (validRows.length === 0) {
+        if (emergencyRequisitionRows.length === 0) {
             return this.buildResponse([], failures);
         }
 
-        const combinedValidRows = this.combineDuplicateExcelRows(validRows);
+        const combinedValidRows = this.combineDuplicateExcelRows(emergencyRequisitionRows);
 
         const affectedMaterialsByReportType = this.buildAffectedMaterialsByReportType(combinedValidRows);
         const affectedReportTypes = Array.from(affectedMaterialsByReportType.keys()).sort((left, right) => left - right);

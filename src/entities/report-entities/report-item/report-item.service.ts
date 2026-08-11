@@ -28,7 +28,13 @@ export class ReportItemService {
                 materialId: eatAllocation.materialId,
                 reportsTypesIds: [REPORT_TYPES.ALLOCATION],
                 recipientUnitId: eatAllocation.unitId
-            });
+            }, transaction);
+
+            const recipientUnitAllocations = await this.repository.fetchReports({
+                date: eatAllocation.date,
+                reportsTypesIds: [REPORT_TYPES.ALLOCATION],
+                recipientUnitId: eatAllocation.unitId
+            }, transaction);
 
             const recipientUnitItem = recipientUnitAllocation?.[0]?.items?.[0]?.dataValues;
             const availableQuantityToEat = round(Number(recipientUnitItem?.balanceQuantity ?? 0), 3);
@@ -49,7 +55,7 @@ export class ReportItemService {
                     materialId: eatAllocation.materialId,
                     reportsTypesIds: [REPORT_TYPES.ALLOCATION],
                     recipientUnitId: eatAllocation.screenUnitId
-                });
+                }, transaction);
 
                 screenUnitItem = screenUnitAllocation?.[0]?.items?.[0]?.dataValues;
 
@@ -64,7 +70,22 @@ export class ReportItemService {
                 recipientUnitItem.balanceQuantity = Number(recipientUnitItem.balanceQuantity) - Number(eatAllocation.quantity);
                 recipientUnitItem.confirmedQuantity! = Number(recipientUnitItem.confirmedQuantity) - Number(eatAllocation.quantity);
 
-                if (recipientUnitItem.confirmedQuantity === 0) {
+                const recipientAllocationItems = recipientUnitAllocations.flatMap(
+                    allocation => allocation.items ?? []
+                );
+                const allAllocationBalancesAreZero = recipientAllocationItems.length > 0 &&
+                    recipientAllocationItems.every(({ dataValues: allocationItem }) => {
+                        const isConsumedItem = allocationItem.reportId === recipientUnitItem.reportId &&
+                            allocationItem.materialId === recipientUnitItem.materialId &&
+                            allocationItem.reportingLevel === recipientUnitItem.reportingLevel;
+                        const balanceQuantity = isConsumedItem
+                            ? recipientUnitItem.balanceQuantity
+                            : allocationItem.balanceQuantity;
+
+                        return Number(balanceQuantity) === 0;
+                    });
+
+                if (allAllocationBalancesAreZero) {
                     await this.unitStatusRepository.updateStatuses([{
                         date: new Date(eatAllocation.date),
                         unitId: eatAllocation.unitId,
