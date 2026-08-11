@@ -53,6 +53,7 @@ type SearchUnitsComboboxOptions = {
   filter: string;
   currentLevel: number;
   parentUnitId?: number;
+  connectedToUnitId?: number;
 };
 
 type LowerLevelUnitsConnectionOptions = {
@@ -307,7 +308,7 @@ export class UnitHierarchyService {
 
   async searchUnitsCombobox(
     date: string,
-    { filter, currentLevel, parentUnitId }: SearchUnitsComboboxOptions,
+    { filter, currentLevel, parentUnitId, connectedToUnitId }: SearchUnitsComboboxOptions,
   ) {
     if (!Number.isFinite(currentLevel)) return [];
 
@@ -360,6 +361,16 @@ export class UnitHierarchyService {
       }
     }
 
+    const connectedUnitIds = connectedToUnitId === undefined
+      ? undefined
+      : buildConnectedUnitIds(
+        connectedToUnitId,
+        (await this.repository.fetchActive(date)).map((relation) => ({
+          unitId: relation.unitId,
+          relatedUnitId: relation.relatedUnitId,
+        })),
+      );
+
     return uniqueUnitIds
       .map((unitId): UnitHierarchyNode => {
         const detail = detailByUnit.get(unitId);
@@ -392,6 +403,9 @@ export class UnitHierarchyService {
       })
       .filter(
         (unit) => parentUnitId === undefined || unit.parent?.id !== parentUnitId,
+      )
+      .filter(
+        (unit) => connectedUnitIds === undefined || connectedUnitIds.has(unit.id),
       )
       .sort((left, right) => {
         if (left.level !== right.level) return left.level - right.level;

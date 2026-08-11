@@ -223,4 +223,54 @@ describe('UnitHierarchyService', () => {
     });
   });
 
+  describe('searchUnitsCombobox', () => {
+    it('returns only descendants of the requested connected unit', async () => {
+      const { repository, service } = buildService({
+        unitDetails: [],
+        relations: [],
+      });
+      const connectedUnit = buildUnitDetail(3, 'Connected', 2);
+      const disconnectedUnit = buildUnitDetail(4, 'Disconnected', 2);
+
+      (repository as any).fetchActiveUnitDetailsBySearch = jest.fn().mockResolvedValue([
+        connectedUnit,
+        disconnectedUnit,
+      ]);
+      repository.fetchDirectParentRelations.mockResolvedValue([
+        buildRelation(1, 3),
+        buildRelation(9, 4),
+      ]);
+      (repository as any).fetchActiveUnitDetailsByIds = jest.fn().mockResolvedValue([
+        buildUnitDetail(1, 'Screen', 1),
+        buildUnitDetail(9, 'Other parent', 1),
+      ]);
+      (repository as any).fetchActive = jest.fn().mockResolvedValue([
+        buildRelation(1, 3),
+        buildRelation(9, 4),
+      ]);
+
+      await expect(service.searchUnitsCombobox('2026-06-02', {
+        filter: '',
+        currentLevel: 1,
+        connectedToUnitId: 1,
+      })).resolves.toEqual([
+        {
+          id: 3,
+          description: 'Connected',
+          level: 2,
+          simul: '3',
+          isEmergencyUnit: false,
+          status: { id: 0, description: 'בדיווח' },
+          parent: {
+            id: 1,
+            description: 'Screen',
+            level: 1,
+            simul: '1',
+            status: { id: 0, description: 'בדיווח' },
+          },
+        },
+      ]);
+    });
+  });
+
 });

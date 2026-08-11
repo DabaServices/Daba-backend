@@ -16,11 +16,13 @@ export class UnitHierarchyController {
     @Query("filter") filter = "",
     @Query("currentLevel") currentLevel?: string,
     @Query("parentUnitId") parentUnitId?: string,
+    @Query("connectedToUnitId") connectedToUnitId?: string,
   ) {
     return this.service.searchUnitsCombobox(request?.["date"], {
       filter,
       currentLevel: Number(currentLevel),
       parentUnitId: parentUnitId === undefined ? undefined : Number(parentUnitId),
+      connectedToUnitId: connectedToUnitId === undefined ? undefined : Number(connectedToUnitId),
     });
   }
 
