@@ -119,8 +119,10 @@ const buildEmergencyUnitIds = (
   const gdudUnitIds: number[] = [];
 
   for (const [unitId, detail] of detailByUnit) {
-    if ((detail.unitLevelId ?? 0) === UNIT_LEVELS.GDUD 
-  || (detail.unitLevelId ?? 0) === UNIT_LEVELS.COMPANY) {
+    if (
+      (detail.unitLevelId ?? 0) === UNIT_LEVELS.GDUD ||
+      (detail.unitLevelId ?? 0) === UNIT_LEVELS.COMPANY
+    ) {
       emergencyUnitIds.add(unitId);
       gdudUnitIds.push(unitId);
     }
@@ -159,7 +161,7 @@ export class UnitHierarchyService {
     private readonly unitStatusTypesRepository: UnitStatusRepository,
     private readonly reportRoutingRepository: ReportRoutingRepository,
     private readonly unitUserRepository: UserRepository,
-  ) { }
+  ) {}
 
   async getRootUnitIdForUser(username: string): Promise<number> {
     const userUnit = await this.unitUserRepository.fetchUnitUser(username);
@@ -233,16 +235,19 @@ export class UnitHierarchyService {
       }
     }
 
-    const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, directParentRelations);
+    const emergencyUnitIds = buildEmergencyUnitIds(
+      detailByUnit,
+      directParentRelations,
+    );
     const matkalConnectedUnitIds = new Set([
       MATKAL_UNIT_ID,
       ...buildConnectedUnitIds(MATKAL_UNIT_ID, directParentRelations),
     ]);
     const connectedUnitIds = connectedRootUnitId
       ? new Set([
-        connectedRootUnitId,
-        ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
-      ])
+          connectedRootUnitId,
+          ...buildConnectedUnitIds(connectedRootUnitId, directParentRelations),
+        ])
       : null;
     const responseUnitIds = connectedUnitIds
       ? uniqueUnitIds.filter((unitId) => connectedUnitIds.has(unitId))
@@ -270,14 +275,14 @@ export class UnitHierarchyService {
 
       const parent = parentId
         ? {
-          id: parentId,
-          description: detailByUnit.get(parentId)?.description ?? '',
-          level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
-          simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
-          status:
-            statusByUnit.get(parentId)?.unitStatus?.dataValues ??
-            DEFAULT_STATUS,
-        }
+            id: parentId,
+            description: detailByUnit.get(parentId)?.description ?? '',
+            level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
+            simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
+            status:
+              statusByUnit.get(parentId)?.unitStatus?.dataValues ??
+              DEFAULT_STATUS,
+          }
         : null;
 
       return {
@@ -286,14 +291,15 @@ export class UnitHierarchyService {
         level: detail?.unitLevelId ?? 0,
         simul: detail?.tsavIrgunCodeId ?? '',
         isEmergencyUnit: emergencyUnitIds.has(detail?.unitId ?? 0),
-        isConnectedToMatkal: detail?.unitId ?? 0 === MATKAL_UNIT_ID
-          ? true
-          : matkalConnectedUnitIds.has(detail?.unitId ?? 0),
+        isConnectedToMatkal:
+          (detail?.unitId ?? 0 === MATKAL_UNIT_ID)
+            ? true
+            : matkalConnectedUnitIds.has(detail?.unitId ?? 0),
         ...(connectedUnitIds
           ? {
-            isConnectedToRoot: connectedUnitIds.has(detail?.unitId ?? 0),
-            isRootUnit: detail?.unitId === connectedRootUnitId,
-          }
+              isConnectedToRoot: connectedUnitIds.has(detail?.unitId ?? 0),
+              isRootUnit: detail?.unitId === connectedRootUnitId,
+            }
           : {}),
         status,
         parent,
@@ -308,7 +314,12 @@ export class UnitHierarchyService {
 
   async searchUnitsCombobox(
     date: string,
-    { filter, currentLevel, parentUnitId, connectedToUnitId }: SearchUnitsComboboxOptions,
+    {
+      filter,
+      currentLevel,
+      parentUnitId,
+      connectedToUnitId,
+    }: SearchUnitsComboboxOptions,
   ) {
     if (!Number.isFinite(currentLevel)) return [];
 
@@ -361,15 +372,16 @@ export class UnitHierarchyService {
       }
     }
 
-    const connectedUnitIds = connectedToUnitId === undefined
-      ? undefined
-      : buildConnectedUnitIds(
-        connectedToUnitId,
-        (await this.repository.fetchActive(date)).map((relation) => ({
-          unitId: relation.unitId,
-          relatedUnitId: relation.relatedUnitId,
-        })),
-      );
+    const connectedUnitIds =
+      connectedToUnitId === undefined
+        ? undefined
+        : buildConnectedUnitIds(
+            connectedToUnitId,
+            (await this.repository.fetchActive(date)).map((relation) => ({
+              unitId: relation.unitId,
+              relatedUnitId: relation.relatedUnitId,
+            })),
+          );
 
     return uniqueUnitIds
       .map((unitId): UnitHierarchyNode => {
@@ -378,17 +390,17 @@ export class UnitHierarchyService {
           statusByUnit.get(unitId)?.unitStatus?.dataValues ?? DEFAULT_STATUS;
         const directParentId = parentByChild.get(unitId);
         const parentStatus = directParentId
-          ? statusByUnit.get(directParentId)?.unitStatus?.dataValues ??
-          DEFAULT_STATUS
+          ? (statusByUnit.get(directParentId)?.unitStatus?.dataValues ??
+            DEFAULT_STATUS)
           : DEFAULT_STATUS;
         const parent = directParentId
           ? {
-            id: directParentId,
-            description: detailByUnit.get(directParentId)?.description ?? '',
-            level: detailByUnit.get(directParentId)?.unitLevelId ?? 0,
-            simul: detailByUnit.get(directParentId)?.tsavIrgunCodeId ?? '',
-            status: parentStatus,
-          }
+              id: directParentId,
+              description: detailByUnit.get(directParentId)?.description ?? '',
+              level: detailByUnit.get(directParentId)?.unitLevelId ?? 0,
+              simul: detailByUnit.get(directParentId)?.tsavIrgunCodeId ?? '',
+              status: parentStatus,
+            }
           : null;
 
         return {
@@ -402,10 +414,12 @@ export class UnitHierarchyService {
         };
       })
       .filter(
-        (unit) => parentUnitId === undefined || unit.parent?.id !== parentUnitId,
+        (unit) =>
+          parentUnitId === undefined || unit.parent?.id !== parentUnitId,
       )
       .filter(
-        (unit) => connectedUnitIds === undefined || connectedUnitIds.has(unit.id),
+        (unit) =>
+          connectedUnitIds === undefined || connectedUnitIds.has(unit.id),
       )
       .sort((left, right) => {
         if (left.level !== right.level) return left.level - right.level;
@@ -417,7 +431,7 @@ export class UnitHierarchyService {
     date: string,
     username: string,
     {
-      filter = "",
+      filter = '',
       limit,
       offset,
       isConnectedToRoot,
@@ -525,7 +539,10 @@ export class UnitHierarchyService {
       }
     }
 
-    const emergencyUnitIds = buildEmergencyUnitIds(detailByUnit, activeRelations);
+    const emergencyUnitIds = buildEmergencyUnitIds(
+      detailByUnit,
+      activeRelations,
+    );
 
     return pagedUnitIds.map((unitId): UnitHierarchyNode => {
       const detail = detailByUnit.get(unitId);
@@ -534,14 +551,14 @@ export class UnitHierarchyService {
       const parentId = parentByChild.get(unitId);
       const parent = parentId
         ? {
-          id: parentId,
-          description: detailByUnit.get(parentId)?.description ?? '',
-          level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
-          simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
-          status:
-            statusByUnit.get(parentId)?.unitStatus?.dataValues ??
-            DEFAULT_STATUS,
-        }
+            id: parentId,
+            description: detailByUnit.get(parentId)?.description ?? '',
+            level: detailByUnit.get(parentId)?.unitLevelId ?? 0,
+            simul: detailByUnit.get(parentId)?.tsavIrgunCodeId ?? '',
+            status:
+              statusByUnit.get(parentId)?.unitStatus?.dataValues ??
+              DEFAULT_STATUS,
+          }
         : null;
 
       return {
@@ -849,7 +866,7 @@ export class UnitHierarchyService {
 
       const isLowerUnitUnderMatkal = await this.repository.isUnitUnderRootUnit(
         formattedDate,
-        Number(process.env.MATKAL_UNIT_ID),
+        MATKAL_UNIT_ID,
         lowerUnit,
         transaction,
       );
@@ -980,6 +997,7 @@ export class UnitHierarchyService {
       };
     } catch (error) {
       await transaction.rollback();
+      console.log(error);
       throw error;
     }
   }

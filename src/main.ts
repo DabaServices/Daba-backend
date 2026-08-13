@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as bodyParser from 'body-parser';
@@ -13,12 +14,13 @@ async function bootstrap() {
   app.use(compression());
   app.enableCors({
     origin: '*',
-    methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS'
+    methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
   });
 
   app.use((req, res, next) => {
     const publicPrefixes = ['/api-docs', '/server-time', '/health'];
-    if (publicPrefixes.some(prefix => req.path.startsWith(prefix))) return next();
+    if (publicPrefixes.some((prefix) => req.path.startsWith(prefix)))
+      return next();
     new HeadersMiddeware().use(req, res, next);
   });
   app.use((req, res, next) => {
@@ -34,7 +36,10 @@ async function bootstrap() {
     .setTitle('API')
     .setDescription('Backend API documentation')
     .setVersion('1.0')
-    .addApiKey({ type: 'apiKey', in: 'header', name: 'screendate' }, 'screendate')
+    .addApiKey(
+      { type: 'apiKey', in: 'header', name: 'screendate' },
+      'screendate',
+    )
     .addApiKey({ type: 'apiKey', in: 'header', name: 'user' }, 'user')
     .addSecurityRequirements('screendate')
     .addSecurityRequirements('user')
