@@ -37,7 +37,7 @@ export class SyncOutboxRepository {
 
     /** Stores a batch received by a bridge node untouched, so its origin, identity and order survive the extra hop. */
     async appendForwarded(batch: SyncBatch, transaction: Transaction): Promise<void> {
-        const { batch_id, source_node, sequence } = batch.sync_metadata;
+        const { batch_id, source_node, sequence, generated_at } = batch.sync_metadata;
 
         await this.append(
             batch.operations.map((operation) => ({
@@ -52,7 +52,7 @@ export class SyncOutboxRepository {
                 status: OUTBOX_STATUSES.PENDING,
                 attempts: 0,
                 nextAttemptAt: new Date(),
-                createdAt: new Date()
+                createdAt: new Date(generated_at)
             })),
             transaction
         );

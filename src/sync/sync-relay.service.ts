@@ -30,7 +30,12 @@ export class SyncRelayService implements OnApplicationBootstrap, OnModuleDestroy
 
         this.timer = setInterval(() => void this.drain(), this.config.pollIntervalMs);
         this.timer.unref();
-        this.logger.log(`Relaying "${this.config.nodeId}" to ${this.config.batchesUrl} every ${this.config.pollIntervalMs}ms`);
+
+        if (this.config.sendEnabled) {
+            this.logger.log(`Relaying "${this.config.nodeId}" to ${this.config.batchesUrl} every ${this.config.pollIntervalMs}ms`);
+        } else {
+            this.logger.warn(`Outbound delivery is paused by SYNC_SEND_ENABLED; changes keep queueing in the outbox`);
+        }
     }
 
     onModuleDestroy(): void {
@@ -43,7 +48,9 @@ export class SyncRelayService implements OnApplicationBootstrap, OnModuleDestroy
         this.draining = true;
 
         try {
-            while (await this.deliverNext()) continue;
+            // While sending is paused nothing is lost, only delayed: the outbox keeps its order.
+            if (this.config.sendEnabled) while (await this.deliverNext()) continue;
+
             await this.purge();
         } catch (error) {
             this.logger.error("Relay cycle failed", error instanceof Error ? error.stack : String(error));

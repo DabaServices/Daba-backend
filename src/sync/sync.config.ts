@@ -12,7 +12,10 @@ import { SyncInboundMode } from "./sync.types";
  * SYNC_INBOUND_MODE         APPLY   -> write inbound batches into the business tables (a backend node)
  *                           FORWARD -> queue inbound batches and relay them onwards (the bridge server)
  * SYNC_RELAY_ENABLED        run the outbound relay loop here. Exactly one instance per node.
- * SYNC_PEER_URL             base URL of the next hop, e.g. "https://sync-bridge.internal:3000"
+ * SYNC_SEND_ENABLED         false pauses outbound delivery. Changes keep queueing in the outbox and
+ *                           resume in order once it is turned back on (default true).
+ * SYNC_PEER_URL             destination of the outbound relay: base URL of the next hop,
+ *                           e.g. "https://sync-bridge.internal:3000". Change it to redirect delivery.
  * SYNC_TOKEN                shared secret presented on every hop. Required whenever sync is enabled.
  * SYNC_TABLES               optional comma separated allowlist of physical tables. Empty = every mapped table.
  * SYNC_POLL_INTERVAL_MS     relay poll period (default 1000)
@@ -28,6 +31,7 @@ export class SyncConfig {
     readonly nodeId: string;
     readonly inboundMode: SyncInboundMode;
     readonly relayEnabled: boolean;
+    readonly sendEnabled: boolean;
     readonly peerUrl: string;
     readonly token: string;
     readonly tables: ReadonlySet<string>;
@@ -43,6 +47,7 @@ export class SyncConfig {
         this.nodeId = configService.get<string>("SYNC_NODE_ID", "").trim();
         this.inboundMode = readInboundMode(configService);
         this.relayEnabled = this.enabled && readBoolean(configService, "SYNC_RELAY_ENABLED", false);
+        this.sendEnabled = readBoolean(configService, "SYNC_SEND_ENABLED", true);
         this.peerUrl = configService.get<string>("SYNC_PEER_URL", "").trim().replace(/\/+$/, "");
         this.token = configService.get<string>("SYNC_TOKEN", "");
         this.tables = readTables(configService);
@@ -71,7 +76,8 @@ export class SyncConfig {
         const missing = [
             !this.nodeId && "SYNC_NODE_ID",
             !this.token && "SYNC_TOKEN",
-            this.relayEnabled && !this.peerUrl && "SYNC_PEER_URL"
+            // A paused relay never dials the peer, so the destination may still be unset.
+            this.relayEnabled && this.sendEnabled && !this.peerUrl && "SYNC_PEER_URL"
         ].filter(Boolean);
 
         if (missing.length > 0) {

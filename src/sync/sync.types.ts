@@ -48,6 +48,8 @@ export type SyncStatus = {
     node_id: string;
     inbound_mode: SyncInboundMode;
     relay_enabled: boolean;
+    send_enabled: boolean;
+    peer_url: string;
     pending_batches: number;
     pending_operations: number;
     oldest_pending_at: string | null;

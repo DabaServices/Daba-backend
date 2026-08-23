@@ -61,6 +61,8 @@ export class SyncInboundService {
             node_id: this.config.nodeId,
             inbound_mode: this.config.inboundMode,
             relay_enabled: this.config.relayEnabled,
+            send_enabled: this.config.sendEnabled,
+            peer_url: this.config.peerUrl,
             pending_batches: backlog.batches,
             pending_operations: backlog.operations,
             oldest_pending_at: backlog.oldestPendingAt?.toISOString() ?? null,

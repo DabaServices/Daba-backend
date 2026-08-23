@@ -8,6 +8,8 @@ import { HeadersMiddeware } from './common/middlewares/headers';
 import { SYNC_ROUTE } from './sync/sync.constants';
 
 const UNAUTHENTICATED_PATHS = ['/api-docs', '/server-time', `/${SYNC_ROUTE}`];
+const isUnauthenticated = (path: string) =>
+  UNAUTHENTICATED_PATHS.some((allowed) => path === allowed || path.startsWith(`${allowed}/`));
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -17,7 +19,7 @@ async function bootstrap() {
   });
 
   app.use((req, res, next) => {
-    if (UNAUTHENTICATED_PATHS.some((path) => req.path.startsWith(path))) return next();
+    if (isUnauthenticated(req.path)) return next();
     new HeadersMiddeware().use(req, res, next);
   });
   app.useGlobalInterceptors(new ResponseInterceptor());
