@@ -5,6 +5,9 @@ import { AppModule } from './appModule.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { HeadersMiddeware } from './common/middlewares/headers';
+import { SYNC_ROUTE } from './sync/sync.constants';
+
+const UNAUTHENTICATED_PATHS = ['/api-docs', '/server-time', `/${SYNC_ROUTE}`];
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,7 +17,7 @@ async function bootstrap() {
   });
 
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api-docs') || req.path.startsWith('/server-time')) return next();
+    if (UNAUTHENTICATED_PATHS.some((path) => req.path.startsWith(path))) return next();
     new HeadersMiddeware().use(req, res, next);
   });
   app.useGlobalInterceptors(new ResponseInterceptor());
