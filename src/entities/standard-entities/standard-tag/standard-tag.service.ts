@@ -1,4 +1,6 @@
 import { BadGatewayException, Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
 import { StandardTagRepository } from "./standard-tag.repository";
 import { CreateTagDTO, UpdateTagDTO } from "./standard-tag.types";
 import { IStandardTag } from "./standard-tag.model";
@@ -8,7 +10,9 @@ import { StandardValuesRepository } from "../standard-values/standard-values.rep
 
 @Injectable()
 export class StandardTagService {
-    constructor(private readonly repository: StandardTagRepository,
+    constructor(
+        @InjectConnection() private readonly sequelize: Sequelize,
+        private readonly repository: StandardTagRepository,
         private readonly standardValuesRepository: StandardValuesRepository
     ) { }
 
@@ -24,7 +28,8 @@ export class StandardTagService {
                 })
             }
 
-            await this.repository.createTag(createTag as IStandardTag);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.createTag(createTag as IStandardTag, transaction));
 
             return {
                 message: 'התגית נוצרה בהצלחה',
@@ -53,7 +58,8 @@ export class StandardTagService {
                 })
             }
 
-            await this.repository.updateTag(updateTag);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.updateTag(updateTag, transaction));
 
             return {
                 message: 'התגית עודכנה בהצלחה',
@@ -80,7 +86,7 @@ export class StandardTagService {
                 })
             }
 
-            await this.repository.deleteTag(id);
+            await this.sequelize.transaction((transaction) => this.repository.deleteTag(id, transaction));
 
             return {
                 message: 'התגית נמחקה בהצלחה',

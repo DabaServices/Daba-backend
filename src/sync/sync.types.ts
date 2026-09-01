@@ -1,9 +1,6 @@
-import { OUTBOX_STATUSES, SYNC_ACTIONS, SYNC_INBOUND_MODES, SYNC_RESULTS } from "./sync.constants";
+import { SYNC_ACTIONS } from "./sync.constants";
 
 export type SyncAction = (typeof SYNC_ACTIONS)[keyof typeof SYNC_ACTIONS];
-export type SyncInboundMode = (typeof SYNC_INBOUND_MODES)[keyof typeof SYNC_INBOUND_MODES];
-export type SyncResult = (typeof SYNC_RESULTS)[keyof typeof SYNC_RESULTS];
-export type SyncOutboxStatus = (typeof OUTBOX_STATUSES)[keyof typeof OUTBOX_STATUSES];
 
 /**
  * A single row level change expressed in physical database terms, so the payload stays readable
@@ -36,24 +33,4 @@ export type SyncMetadata = {
 export type SyncBatch = {
     sync_metadata: SyncMetadata;
     operations: SyncOperation[];
-};
-
-export type SyncReceipt = {
-    status: SyncResult;
-    batch_id: string;
-    operations: number;
-};
-
-export type SyncStatus = {
-    node_id: string;
-    inbound_mode: SyncInboundMode;
-    relay_enabled: boolean;
-    send_enabled: boolean;
-    peer_url: string;
-    pending_batches: number;
-    pending_operations: number;
-    oldest_pending_at: string | null;
-    head_attempts: number;
-    head_last_error: string | null;
-    sequences: { node_id: string; last_sequence: number; last_batch_id: string | null }[];
 };

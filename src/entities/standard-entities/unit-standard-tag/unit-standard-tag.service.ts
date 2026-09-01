@@ -1,4 +1,6 @@
 import { BadGatewayException, BadRequestException, Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
 import { UnitStanadrdTagRepository } from "./unit-standard-tag.repository";
 import { CreateUnitStandardTag, DeleteUnitStandardTag } from "./unit-standard-tag.types";
 import { MESSAGE_TYPES } from "../../../constants";
@@ -7,7 +9,9 @@ import { StandardTagRepository } from "../standard-tag/standard-tag.repository";
 
 @Injectable()
 export class UnitStandardTagService {
-    constructor(private readonly repository: UnitStanadrdTagRepository,
+    constructor(
+        @InjectConnection() private readonly sequelize: Sequelize,
+        private readonly repository: UnitStanadrdTagRepository,
         private readonly standardTagRepository: StandardTagRepository
     ) { }
 
@@ -37,7 +41,8 @@ export class UnitStandardTagService {
                     type: MESSAGE_TYPES.FAILURE
                 });
             }
-            await this.repository.createUnitStandardTag(createUnitStandardTag);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.createUnitStandardTag(createUnitStandardTag, transaction));
 
             return {
                 message: 'היחידה התווספה אל התגית',
@@ -55,7 +60,8 @@ export class UnitStandardTagService {
 
     async removeUnitStandardTag(deleteUnitStandardTag: DeleteUnitStandardTag) {
         try {
-            await this.repository.removeUnitStandardTag(deleteUnitStandardTag);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.removeUnitStandardTag(deleteUnitStandardTag, transaction));
 
             return {
                 message: 'היחידה נמחקה מן התגית',

@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
+import { Transaction } from "sequelize";
 import { UnitFavoriteMaterial } from "./unit-favorite-material.model";
 import { CreateUnitFavoriteMaterial, DeleteUnitFavoriteMaterial } from "./DTO/dto";
 
@@ -7,17 +8,14 @@ import { CreateUnitFavoriteMaterial, DeleteUnitFavoriteMaterial } from "./DTO/dt
 export class UnitFavoriteMaterialRepository {
     constructor(@InjectModel(UnitFavoriteMaterial) private readonly unitFavoriteMaterialModel: typeof UnitFavoriteMaterial) { }
 
-    async create(unitFavoriteMaterial: CreateUnitFavoriteMaterial) {
-        try {
-            return await this.unitFavoriteMaterialModel.create(unitFavoriteMaterial);
-        } catch (error) {
-            console.log(error);
-        }
+    create(unitFavoriteMaterial: CreateUnitFavoriteMaterial, transaction: Transaction) {
+        return this.unitFavoriteMaterialModel.create(unitFavoriteMaterial, { transaction });
     }
 
-    destroy(unitFavoriteMaterial: DeleteUnitFavoriteMaterial) {
+    destroy(unitFavoriteMaterial: DeleteUnitFavoriteMaterial, transaction: Transaction) {
         return this.unitFavoriteMaterialModel.destroy({
-            where: { ...unitFavoriteMaterial }
+            where: { ...unitFavoriteMaterial },
+            transaction
         })
     }
 }

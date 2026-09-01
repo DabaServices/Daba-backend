@@ -1,4 +1,6 @@
 import { BadGatewayException, Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
 import { TagGroupRepository } from "./tag-group.repository";
 import { ITagGroup } from "./tag-group.model";
 import { MESSAGE_TYPES } from "../../../constants";
@@ -8,7 +10,9 @@ import { StandardValuesRepository } from "../standard-values/standard-values.rep
 
 @Injectable()
 export class TagGroupService {
-    constructor(private readonly repository: TagGroupRepository,
+    constructor(
+        @InjectConnection() private readonly sequelize: Sequelize,
+        private readonly repository: TagGroupRepository,
         private readonly standardValuesRepository: StandardValuesRepository
     ) { }
 
@@ -45,7 +49,8 @@ export class TagGroupService {
                 })
             }
 
-            await this.repository.createTagGroup(createTagGroupDTO as ITagGroup);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.createTagGroup(createTagGroupDTO as ITagGroup, transaction));
 
             return {
                 message: `התגית ${createTagGroupDTO.description} נשמרה בהצלחה`,
@@ -72,7 +77,8 @@ export class TagGroupService {
                 })
             }
 
-            await this.repository.updateTagGroup(updateTagGroupDTO);
+            await this.sequelize.transaction((transaction) =>
+                this.repository.updateTagGroup(updateTagGroupDTO, transaction));
 
             return {
                 message: 'קבוצת התגיות נערכה בהצלחה',
@@ -99,7 +105,7 @@ export class TagGroupService {
                 })
             }
 
-            await this.repository.deleteTagGroup(id);
+            await this.sequelize.transaction((transaction) => this.repository.deleteTagGroup(id, transaction));
 
             return {
                 message: 'קבוצת התגיות נמחקה בהצלחה',

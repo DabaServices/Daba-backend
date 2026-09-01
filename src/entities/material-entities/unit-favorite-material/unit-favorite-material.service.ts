@@ -1,15 +1,21 @@
 import { BadGatewayException, Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
 import { MESSAGE_TYPES } from "../../../constants";
 import { CreateUnitFavoriteMaterial, DeleteUnitFavoriteMaterial } from "./DTO/dto";
 import { UnitFavoriteMaterialRepository } from "./unit-favorite-material.repository";
 
 @Injectable()
 export class UnitFavoriteMaterialService {
-    constructor(private readonly repository: UnitFavoriteMaterialRepository) { }
+    constructor(
+        @InjectConnection() private readonly sequelize: Sequelize,
+        private readonly repository: UnitFavoriteMaterialRepository
+    ) { }
 
     async create(unitFavoriteMaterial: CreateUnitFavoriteMaterial) {
         try {
-            return await this.repository.create(unitFavoriteMaterial);
+            return await this.sequelize.transaction((transaction) =>
+                this.repository.create(unitFavoriteMaterial, transaction));
         } catch (error) {
             console.log(error);
             throw new BadGatewayException({
@@ -21,7 +27,8 @@ export class UnitFavoriteMaterialService {
 
     async destroy(unitFavoriteMaterial: DeleteUnitFavoriteMaterial) {
         try {
-            const deletedCount = await this.repository.destroy(unitFavoriteMaterial);
+            const deletedCount = await this.sequelize.transaction((transaction) =>
+                this.repository.destroy(unitFavoriteMaterial, transaction));
 
             return {
                 data: { deletedCount },

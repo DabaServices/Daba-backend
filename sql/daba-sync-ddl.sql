@@ -1,37 +1,7 @@
 -- Cross network synchronization.
--- Deployed identically on both networks and on the bridge server; only the environment differs.
+-- Deployed identically on both networks; only the environment differs.
 
-CREATE SEQUENCE IF NOT EXISTS shoval.sync_outbox_id_seq AS bigint START WITH 1;
-
--- One row per captured change. Rows sharing batch_id belong to a single source transaction,
--- become visible together and are delivered together.
-CREATE TABLE IF NOT EXISTS shoval.sync_outbox (
-    id bigint DEFAULT nextval('shoval.sync_outbox_id_seq'::regclass) NOT NULL,
-    batch_id uuid NOT NULL,
-    source_node varchar(64) NOT NULL,
-    table_name varchar(128) NOT NULL,
-    action varchar(16) NOT NULL,
-    data jsonb NOT NULL,
-    update_fields jsonb,
-    conflict_fields jsonb,
-    status varchar(16) DEFAULT 'PENDING' NOT NULL,
-    sequence bigint,
-    attempts integer DEFAULT 0 NOT NULL,
-    next_attempt_at timestamptz DEFAULT now() NOT NULL,
-    last_error text,
-    created_at timestamptz DEFAULT now() NOT NULL,
-    sent_at timestamptz,
-    CONSTRAINT sync_outbox_pkey PRIMARY KEY (id),
-    CONSTRAINT sync_outbox_action_check CHECK (action IN ('UPSERT', 'UPDATE', 'DELETE')),
-    CONSTRAINT sync_outbox_status_check CHECK (status IN ('PENDING', 'SENT'))
-);
-
--- The relay always reads the oldest undelivered row, then the rest of its batch.
-CREATE INDEX IF NOT EXISTS sync_outbox_pending_idx ON shoval.sync_outbox USING btree (id) WHERE status = 'PENDING';
-CREATE INDEX IF NOT EXISTS sync_outbox_batch_idx ON shoval.sync_outbox USING btree (batch_id);
-CREATE INDEX IF NOT EXISTS sync_outbox_sent_idx ON shoval.sync_outbox USING btree (sent_at) WHERE status = 'SENT';
-
--- Highest batch sequence known for a node: for a remote node the last batch applied from it,
+-- Highest batch sequence known for a node: for the remote node the last batch applied from it,
 -- for this node the last batch emitted. Updated in the same transaction as the batch itself,
 -- which is what makes delivery exactly-once and strictly ordered.
 CREATE TABLE IF NOT EXISTS shoval.sync_sequences (

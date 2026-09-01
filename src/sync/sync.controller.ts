@@ -1,9 +1,8 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
+import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards, UsePipes, ValidationPipe } from "@nestjs/common";
 import { SYNC_BATCHES_PATH, SYNC_ROUTE } from "./sync.constants";
 import { SyncBatchDto } from "./sync.dto";
 import { SyncInboundService } from "./sync-inbound.service";
 import { SyncTokenGuard } from "./sync-token.guard";
-import { SyncReceipt, SyncStatus } from "./sync.types";
 
 @Controller(SYNC_ROUTE)
 @UseGuards(SyncTokenGuard)
@@ -12,17 +11,12 @@ export class SyncController {
     constructor(private readonly service: SyncInboundService) { }
 
     /**
-     * 200 - the batch was applied, forwarded, or already known.
-     * 409 - a predecessor is still missing; the sender retries until the gap closes.
+     * The status is the whole answer: 200 lets the sender commit, anything else makes it roll back.
+     * 409 means the batch is out of order.
      */
     @Post(SYNC_BATCHES_PATH)
     @HttpCode(HttpStatus.OK)
-    receiveBatch(@Body() batch: SyncBatchDto): Promise<SyncReceipt> {
+    receiveBatch(@Body() batch: SyncBatchDto): Promise<void> {
         return this.service.receive(batch);
-    }
-
-    @Get("status")
-    status(): Promise<SyncStatus> {
-        return this.service.status();
     }
 }

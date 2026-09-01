@@ -1,31 +1,30 @@
 # Cross network synchronization
 
-Two isolated networks, each with its own database, both accepting writes. This module keeps them
-converged without anyone having to remember to call it.
+Two isolated networks, each with its own database, both accepting writes. A change is sent to the
+peer **before** the local transaction commits: the peer accepting it is a precondition of the
+commit, so a change either exists on both networks or on neither.
 
-Every participant runs **this same image**. Only the environment variables differ.
+Both networks run **this same image**. Only the environment variables differ.
 
 ```
-Network A backend  ──►  Bridge A→B  ──►  Network B backend
-Network A backend  ◄──  Bridge B→A  ◄──  Network B backend
+Network A backend  ──►  Network B backend
+Network A backend  ◄──  Network B backend
 ```
 
 ## How it works
 
-1. **Capture.** Global Sequelize hooks write one `sync_outbox` row per change, inside the same
-   transaction as the change itself. No repository or service calls anything — a write that
-   commits is captured, a write that rolls back leaves nothing behind.
-2. **Batch.** Every row produced by one source transaction shares a `batch_id`. They become
-   visible together, travel together, and are replayed on the peer inside a single transaction:
-   all of it lands, or none of it.
-3. **Order.** The relay stamps each batch with a gapless `sequence`. The receiver keeps a
-   row-locked cursor per source node: a batch it already saw is acknowledged as a duplicate, a
-   batch that arrives too early is refused with `409` until its predecessor lands.
-4. **No loops.** Statements produced by a replay carry a suppression flag, so the hooks ignore
+1. **Capture.** Global Sequelize hooks describe every change as a row level operation. Nothing is
+   written to disk and no repository or service calls anything — a write that happens is captured.
+2. **Batch.** Every operation produced inside one transaction is collected into a single batch and
+   is replayed on the peer inside a single transaction: all of it lands, or none of it.
+3. **Send before commit.** The transaction's `commit` is the send point. The batch goes to the
+   peer, and only a `200` lets the local commit proceed. Anything else throws, the caller rolls
+   back, and neither side keeps the change.
+4. **Order.** Each batch carries a gapless `sequence` reserved under a row lock inside the same
+   transaction. The receiver keeps a cursor per source node and refuses anything that is not the
+   next number with a `409`.
+5. **No loops.** Statements produced by a replay carry a suppression flag, so the hooks ignore
    them. Data created locally on either side still flows normally.
-5. **Delivery.** A background relay polls the outbox, sends the oldest batch first, retries with
-   exponential backoff, and never lets a later batch overtake a failing one. Delivered rows are
-   kept for audit, then purged.
 
 ## Payload
 
@@ -55,10 +54,10 @@ Network A backend  ◄──  Bridge B→A  ◄──  Network B backend
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `batch_id` | yes | UUID of one source transaction. Replaying it is acknowledged as a duplicate. |
+| `batch_id` | yes | UUID of one source transaction. Resending it is acknowledged as a duplicate. |
 | `source_node` | yes | Who produced the batch. A node rejects a batch bearing its own id. |
-| `sequence` | yes | Gapless counter per source node, starting at 1. Arriving early is refused with `409`. |
-| `generated_at` | yes | When the source transaction committed. Survives a bridge hop unchanged. |
+| `sequence` | yes | Gapless counter per source node, starting at 1. Out of order is refused with `409`. |
+| `generated_at` | yes | When the batch was sent. |
 | `table` | yes | Physical table name. Unknown or non replicated tables are refused with `400`. |
 | `action` | yes | `UPSERT`, `UPDATE` or `DELETE`. |
 | `data` | yes | Flat `column -> value` dictionary. Unknown columns are refused with `400`. |
@@ -125,30 +124,16 @@ on that row are left exactly as the receiver already had them.
 
 ### Response
 
-`200` with the usual envelope:
-
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "body": {
-    "data": {
-      "status": "APPLIED",
-      "batch_id": "6f1c2a4e-9b3d-4c7a-8f21-0d5e7b9a1c33",
-      "operations": 3
-    }
-  }
-}
-```
+The status is the whole answer; the body carries nothing the sender reads.
 
 | Status | Meaning |
 | --- | --- |
-| `APPLIED` | written into the local tables |
-| `FORWARDED` | a bridge queued it for the next hop |
-| `DUPLICATE` | already seen; nothing was written |
+| `200` | applied, or already known. The sender commits. |
+| `400` | unknown table or column, or the batch came back to its own producer. |
+| `401` | bad or missing `x-sync-token`. |
+| `409` | out of order: the batch is not the next sequence for that node. |
 
-`409` means a predecessor is still missing. The sender keeps the batch and retries until the gap
-closes, so this is a normal part of operation rather than an error to chase.
+Anything other than `200` makes the sender roll back, so the change is saved on neither side.
 
 ## Setup
 
@@ -175,16 +160,14 @@ Never `setval` a sequence to the peer's `MAX(id)` — that walks a node into the
 
 ### 3. Environment
 
-Pick one shared secret and use it on every hop.
+Pick one shared secret and use it on both sides.
 
 **Network A backend**
 
 ```env
 SYNC_ENABLED=true
 SYNC_NODE_ID=network_a
-SYNC_INBOUND_MODE=APPLY
-SYNC_RELAY_ENABLED=true
-SYNC_PEER_URL=https://bridge-a-to-b.internal:3000
+SYNC_PEER_URL=https://network-b-backend.internal:3000
 SYNC_TOKEN=<shared secret>
 ```
 
@@ -193,84 +176,42 @@ SYNC_TOKEN=<shared secret>
 ```env
 SYNC_ENABLED=true
 SYNC_NODE_ID=network_b
-SYNC_INBOUND_MODE=APPLY
-SYNC_RELAY_ENABLED=true
-SYNC_PEER_URL=https://bridge-b-to-a.internal:3000
+SYNC_PEER_URL=https://network-a-backend.internal:3000
 SYNC_TOKEN=<shared secret>
 ```
-
-**Bridge, A → B**
-
-```env
-SYNC_ENABLED=true
-SYNC_NODE_ID=bridge_a_to_b
-SYNC_INBOUND_MODE=FORWARD
-SYNC_RELAY_ENABLED=true
-SYNC_PEER_URL=https://network-b-backend.internal:3000
-SYNC_TOKEN=<shared secret>
-```
-
-**Bridge, B → A** — same, with `SYNC_NODE_ID=bridge_b_to_a` and `SYNC_PEER_URL` pointing at
-network A.
-
-A bridge relays to exactly one peer, so each direction is its own process with its own database
-(the two `sync_outbox` tables must not be shared). A bridge only needs the two `sync_` tables; it
-never touches business data.
 
 `SYNC_NODE_ID` is permanent. Reusing or renaming one resets the receiver's cursor and will make
 batches look like duplicates or gaps.
 
-### 4. Optional tuning
+### 4. Optional
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SYNC_SEND_ENABLED` | `true` | set to `false` to stop shipping without losing anything |
-| `SYNC_TABLES` | all mapped tables | comma separated allowlist of physical tables |
-| `SYNC_POLL_INTERVAL_MS` | `1000` | relay poll period |
-| `SYNC_HTTP_TIMEOUT_MS` | `10000` | timeout of one delivery attempt |
-| `SYNC_RETRY_BASE_MS` | `1000` | first retry delay, doubled on each failure |
-| `SYNC_RETRY_MAX_MS` | `60000` | retry delay ceiling |
-| `SYNC_ALERT_AFTER_ATTEMPTS` | `10` | log an error once the head batch has failed this often |
-| `SYNC_RETENTION_DAYS` | `14` | how long delivered rows are kept |
+| `SYNC_TABLES` | all mapped tables | comma separated allowlist of physical tables. Must match on both nodes. |
+| `SYNC_HTTP_TIMEOUT_MS` | `10000` | how long a local transaction may wait for the peer |
 
 Leave `SYNC_ENABLED` unset to run the backend exactly as before — the module stays inert.
 
-### 5. The two outbound switches
+## What this costs
 
-`SYNC_PEER_URL` is the **destination**. Point it somewhere else and the next batch goes there —
-swap a bridge, fail over to a standby, or aim a node at a staging peer. Only the relay reads it,
-so changing it never affects inbound traffic.
+The guarantee is bought with availability and throughput, and the trade is not subtle:
 
-`SYNC_SEND_ENABLED=false` **pauses delivery**. Capture keeps running, the outbox keeps growing, and
-nothing is dropped; the moment it is turned back on the queue drains in its original order. Use it
-while the peer is down for maintenance, or when redirecting `SYNC_PEER_URL`, so nothing is in flight
-during the switch. It is deliberately separate from `SYNC_RELAY_ENABLED`, which answers a different
-question — *is this the instance that owns the relay loop* — and should stay `true` on exactly one
-instance per node.
+- **The peer being down makes this node read-only.** No write commits without a `200`.
+- **Writes serialize.** The outbound sequence is reserved under a lock on a single row that is held
+  for the whole round trip, so a node commits roughly one write per round trip.
+- **Locks are held across the network.** A slow peer holds row locks for up to
+  `SYNC_HTTP_TIMEOUT_MS`, which is why that timeout should stay small.
+- **It is not truly atomic.** If the peer commits and its answer is lost, the sender rolls back and
+  the peer keeps a change the sender does not have. The duplicate test is on `batch_id` rather than
+  on the sequence number so the sender's next batch is not silently swallowed — it surfaces as a
+  `409` instead of vanishing.
+- **Simultaneous edits to the same row on both networks still diverge.** There is no conflict
+  resolution; each side ends up holding the other's value.
 
-Both are read at startup, so a restart applies them. `GET /sync/status` reports the live values.
+## Writes that bypass the guarantee
 
-## Operating it
+Capture is built on Sequelize model hooks, so a change made with `sequelize.query(...)`, a stored
+procedure or `psql` is never seen and never replicated.
 
-`GET /sync/status` (same token header) reports the backlog and the cursors:
-
-```json
-{
-  "node_id": "network_a",
-  "inbound_mode": "APPLY",
-  "relay_enabled": true,
-  "send_enabled": true,
-  "peer_url": "https://bridge-a-to-b.internal:3000",
-  "pending_batches": 0,
-  "pending_operations": 0,
-  "oldest_pending_at": null,
-  "head_attempts": 0,
-  "head_last_error": null,
-  "sequences": [{ "node_id": "network_b", "last_sequence": 128, "last_batch_id": "..." }]
-}
-```
-
-A growing `pending_batches` together with a rising `head_attempts` means the head batch cannot be
-delivered. Read `head_last_error`, fix the cause, and the relay resumes on its own — nothing is
-skipped and nothing is lost. Blocking on purpose is the point: a later batch may depend on the
-one in front of it.
+A write to a replicated table **must run inside a transaction** — outside one there is no commit to
+hold back, so the statement is refused before it runs rather than saved on one network only.

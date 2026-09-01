@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { Transaction } from "sequelize";
-import { ISyncSequence, SyncSequence } from "./models/sync-sequence.model";
+import { SyncSequence } from "./models/sync-sequence.model";
 
 export const SEQUENCE_DECISION = {
     ACCEPT: "ACCEPT",
@@ -18,14 +18,17 @@ export class SyncSequenceRepository {
      * Decides what to do with an inbound batch and, when it is the expected one, advances the cursor.
      * Runs inside the caller's transaction under a row lock, so a batch is applied exactly once
      * and never before its predecessor.
+     *
+     * The duplicate test is on the batch id rather than the number: a sender that rolled back after
+     * the peer had already committed reuses the number, and that batch must not be mistaken for a replay.
      */
     async reserveInbound(nodeId: string, sequence: number, batchId: string, transaction: Transaction): Promise<SequenceDecision> {
         const cursor = await this.lock(nodeId, transaction);
 
-        if (sequence <= cursor.lastSequence) return SEQUENCE_DECISION.DUPLICATE;
-        if (sequence > cursor.lastSequence + 1) {
+        if (batchId === cursor.lastBatchId) return SEQUENCE_DECISION.DUPLICATE;
+        if (sequence !== cursor.lastSequence + 1) {
             throw new ConflictException(
-                `Batch ${sequence} from "${nodeId}" arrived before ${cursor.lastSequence + 1}; deliver the missing batches first`
+                `Batch ${sequence} from "${nodeId}" is out of order; expected ${cursor.lastSequence + 1}`
             );
         }
 
@@ -42,17 +45,7 @@ export class SyncSequenceRepository {
         return sequence;
     }
 
-    async list(): Promise<ISyncSequence[]> {
-        const rows = await this.sequenceModel.findAll({ order: [["nodeId", "ASC"]] });
-
-        return rows.map((row) => ({
-            nodeId: row.nodeId,
-            lastSequence: Number(row.lastSequence),
-            lastBatchId: row.lastBatchId
-        }));
-    }
-
-    private async lock(nodeId: string, transaction: Transaction): Promise<{ lastSequence: number }> {
+    private async lock(nodeId: string, transaction: Transaction): Promise<{ lastSequence: number; lastBatchId: string | null }> {
         await this.sequenceModel.findOrCreate({
             where: { nodeId },
             defaults: { nodeId, lastSequence: 0, lastBatchId: null, updatedAt: new Date() },
@@ -65,7 +58,7 @@ export class SyncSequenceRepository {
             transaction
         });
 
-        return { lastSequence: Number(cursor!.lastSequence) };
+        return { lastSequence: Number(cursor!.lastSequence), lastBatchId: cursor!.lastBatchId };
     }
 
     private advance(nodeId: string, sequence: number, batchId: string, transaction: Transaction): Promise<unknown> {

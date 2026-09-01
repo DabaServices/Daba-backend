@@ -1,18 +1,24 @@
 import { BadGatewayException, Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/sequelize";
+import { Sequelize } from "sequelize-typescript";
 import { CommentRepository } from "./comment.repository";
 import { CommentDTO } from "./comment.types";
 import { MESSAGE_TYPES } from "../../../constants";
 
 @Injectable()
 export class CommentService {
-    constructor(private readonly repository: CommentRepository) { }
+    constructor(
+        @InjectConnection() private readonly sequelize: Sequelize,
+        private readonly repository: CommentRepository
+    ) { }
 
     async postComment(comment: CommentDTO) {
         try {
-            await this.repository.postComment({
-                ...comment,
-                date: new Date(comment.date)
-            });
+            await this.sequelize.transaction((transaction) =>
+                this.repository.postComment({
+                    ...comment,
+                    date: new Date(comment.date)
+                }, transaction));
 
             return {
                 message: 'ההודעה נשמרה בהצלחה',
@@ -29,10 +35,11 @@ export class CommentService {
 
     async deleteComment(comment: CommentDTO) {
         try {
-            await this.repository.deleteComment({
-                ...comment,
-                date: new Date(comment.date)
-            });
+            await this.sequelize.transaction((transaction) =>
+                this.repository.deleteComment({
+                    ...comment,
+                    date: new Date(comment.date)
+                }, transaction));
 
             return {
                 message: 'ההודעה נמחקה בהצלחה',

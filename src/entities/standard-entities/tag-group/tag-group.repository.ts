@@ -5,7 +5,7 @@ import { StandardTag } from "../standard-tag/standard-tag.model";
 import { UnitStandardTags } from "../unit-standard-tag/unit-standard-tag.model";
 import { UnitId } from "../../unit-entities/unit-id/unit-id.model";
 import { Unit } from "../../unit-entities/unit/unit.model";
-import { Op } from "sequelize";
+import { Op, Transaction } from "sequelize";
 
 @Injectable()
 export class TagGroupRepository {
@@ -48,17 +48,18 @@ export class TagGroupRepository {
         })
     }
 
-    createTagGroup(tagGroup: ITagGroup) {
-        return this.tagGroup.upsert(tagGroup);
+    createTagGroup(tagGroup: ITagGroup, transaction: Transaction) {
+        return this.tagGroup.upsert(tagGroup, { transaction });
     }
 
-    updateTagGroup(tagGroup: ITagGroup) {
-        return this.tagGroup.upsert(tagGroup);
+    updateTagGroup(tagGroup: ITagGroup, transaction: Transaction) {
+        return this.tagGroup.upsert(tagGroup, { transaction });
     }
 
-    deleteTagGroup(id: number) {
+    deleteTagGroup(id: number, transaction: Transaction) {
         return this.tagGroup.destroy({
-            where: { id }
+            where: { id },
+            transaction
         });
     }
 }

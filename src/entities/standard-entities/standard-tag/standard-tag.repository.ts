@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/sequelize";
 import { IStandardTag, StandardTag } from "./standard-tag.model";
-import { Op } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import { UnitStandardTags } from "../unit-standard-tag/unit-standard-tag.model";
 
 @Injectable()
@@ -41,15 +41,15 @@ export class StandardTagRepository {
         })
     }
 
-    createTag(standardTag: IStandardTag) {
-        return this.standardTag.upsert(standardTag);
+    createTag(standardTag: IStandardTag, transaction: Transaction) {
+        return this.standardTag.upsert(standardTag, { transaction });
     }
 
-    updateTag(standardTag: IStandardTag) {
-        return this.standardTag.upsert(standardTag);
+    updateTag(standardTag: IStandardTag, transaction: Transaction) {
+        return this.standardTag.upsert(standardTag, { transaction });
     }
 
-    deleteTag(id: number) {
-        return this.standardTag.destroy({ where: { id } });
+    deleteTag(id: number, transaction: Transaction) {
+        return this.standardTag.destroy({ where: { id }, transaction });
     }
 }
